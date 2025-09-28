@@ -17,8 +17,20 @@ export async function GET(request: NextRequest) {
     const participantName = request.nextUrl.searchParams.get('participantName');
     const metadata = request.nextUrl.searchParams.get('metadata') ?? '';
     const region = request.nextUrl.searchParams.get('region');
+    
+    // Check for required environment variables
     if (!LIVEKIT_URL) {
-      throw new Error('LIVEKIT_URL is not defined');
+      return new NextResponse('LIVEKIT_URL environment variable is not configured. Please set up your LiveKit credentials in Vercel.', { 
+        status: 500,
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    }
+    
+    if (!API_KEY || !API_SECRET) {
+      return new NextResponse('LIVEKIT_API_KEY and LIVEKIT_API_SECRET environment variables are not configured. Please set up your LiveKit credentials in Vercel.', { 
+        status: 500,
+        headers: { 'Content-Type': 'text/plain' }
+      });
     }
     const livekitServerUrl = region ? getLiveKitURL(LIVEKIT_URL, region) : LIVEKIT_URL;
     let randomParticipantPostfix = request.cookies.get(COOKIE_KEY)?.value;
