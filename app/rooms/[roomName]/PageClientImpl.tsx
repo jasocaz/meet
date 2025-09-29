@@ -30,6 +30,7 @@ import {
 } from 'livekit-client';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
+import { useParticipants } from '@livekit/components-react';
 import { useSetupE2EE } from '@/lib/useSetupE2EE';
 import { useLowCPUOptimizer } from '@/lib/usePerfomanceOptimiser';
 
@@ -395,6 +396,21 @@ function HideAgentTiles() {
 function CaptionsTilesOverlay(props: { room: Room }) {
   const { room } = props;
   const [byIdentity, setByIdentity] = React.useState<Record<string, { text: string; ts: number }>>({});
+  const participants = useParticipants();
+
+  const resolveIdentity = React.useCallback(
+    (speaker: string | undefined): string | undefined => {
+      if (!speaker) return undefined;
+      const base = String(speaker).split('__')[0].toLowerCase();
+      const exact = participants.find((p) => p.identity === speaker);
+      if (exact) return exact.identity;
+      const starts = participants.find((p) => p.identity?.startsWith(base));
+      if (starts) return starts.identity;
+      const byName = participants.find((p) => p.name?.toLowerCase() === base);
+      return byName?.identity;
+    },
+    [participants],
+  );
 
   React.useEffect(() => {
     const onData = (
@@ -403,13 +419,26 @@ function CaptionsTilesOverlay(props: { room: Room }) {
       _k?: any,
       topic?: string,
     ) => {
-      if (topic !== 'captions') return;
-      try {
-        const json = JSON.parse(new TextDecoder().decode(payload));
-        if (json?.type === 'transcription' && typeof json.speaker === 'string') {
-          setByIdentity((prev) => ({ ...prev, [json.speaker]: { text: json.text ?? '', ts: Date.now() } }));
+      const text = new TextDecoder().decode(payload);
+      // Primary: JSON on 'captions'
+      if (topic === 'captions') {
+        try {
+          const json = JSON.parse(text);
+          if (json?.type === 'transcription') {
+            const id = resolveIdentity(json.speaker);
+            if (id) setByIdentity((prev) => ({ ...prev, [id]: { text: json.text ?? '', ts: Date.now() } }));
+          }
+          return;
+        } catch {}
+      }
+      // Fallback: plain chat style lines
+      if (text.startsWith('[Transcript]')) {
+        const m = text.match(/^\[Transcript\]\s+([^:]+):\s*(.*)$/);
+        if (m) {
+          const id = resolveIdentity(m[1]);
+          if (id) setByIdentity((prev) => ({ ...prev, [id]: { text: m[2], ts: Date.now() } }));
         }
-      } catch {}
+      }
     };
     room.on(RoomEvent.DataReceived, onData);
     const interval = window.setInterval(() => {
@@ -470,11 +499,11 @@ function CaptionPortal(props: { identity: string; text: string }) {
         position: 'absolute',
         left: 12,
         right: 12,
-        bottom: 48,
+        top: 12,
         zIndex: 9999,
         padding: '6px 10px',
         borderRadius: 8,
-        background: 'rgba(0,0,0,0.55)',
+        background: 'rgba(0,0,0,0.4)',
         color: 'white',
         pointerEvents: 'none',
         fontSize: 14,
