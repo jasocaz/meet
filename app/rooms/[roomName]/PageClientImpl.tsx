@@ -556,8 +556,10 @@ function CaptionPortal(props: { identity: string; blocks: { id: number; ts: numb
   const { identity, blocks, tblocks } = props;
   const participants = useParticipants();
   const [container, setContainer] = React.useState<Element | null>(null);
-  const contentRef = React.useRef<HTMLDivElement | null>(null);
-  const [pinBottom, setPinBottom] = React.useState(true);
+  const transcriptRef = React.useRef<HTMLDivElement | null>(null);
+  const translationRef = React.useRef<HTMLDivElement | null>(null);
+  const [pinTranscriptBottom, setPinTranscriptBottom] = React.useState(true);
+  const [pinTranslationBottom, setPinTranslationBottom] = React.useState(true);
   React.useEffect(() => {
     if (typeof document === 'undefined') return;
     const escId = (window as any).CSS?.escape
@@ -606,15 +608,28 @@ function CaptionPortal(props: { identity: string; blocks: { id: number; ts: numb
   }, [identity, participants]);
 
   React.useEffect(() => {
-    if (!contentRef.current || !pinBottom) return;
-    const el = contentRef.current;
-    requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
-      setTimeout(() => {
+    if (transcriptRef.current && pinTranscriptBottom) {
+      const el = transcriptRef.current;
+      requestAnimationFrame(() => {
         el.scrollTop = el.scrollHeight;
-      }, 0);
-    });
-  }, [blocks, tblocks, pinBottom]);
+        setTimeout(() => {
+          el.scrollTop = el.scrollHeight;
+        }, 0);
+      });
+    }
+  }, [blocks, pinTranscriptBottom]);
+
+  React.useEffect(() => {
+    if (translationRef.current && pinTranslationBottom) {
+      const el = translationRef.current;
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+        setTimeout(() => {
+          el.scrollTop = el.scrollHeight;
+        }, 0);
+      });
+    }
+  }, [tblocks, pinTranslationBottom]);
 
   if (!container) return null;
   return createPortal(
@@ -634,45 +649,70 @@ function CaptionPortal(props: { identity: string; blocks: { id: number; ts: numb
         lineHeight: 1.4,
         textAlign: 'left',
         minHeight: 110,
-        maxHeight: 112, // ~4 lines tall; scrollable
+        maxHeight: 250,
         display: 'flex',
-        alignItems: 'stretch',
-        justifyContent: 'stretch',
+        flexDirection: 'column',
+        gap: 6,
         overflow: 'hidden',
       }}
     >
+      {/* Transcript box (4 lines tall) */}
       <div
-        ref={contentRef}
+        ref={transcriptRef}
         onScroll={(e) => {
           const el = e.currentTarget;
           const nearBottom = el.scrollHeight - (el.scrollTop + el.clientHeight) < 80;
-          setPinBottom(nearBottom);
+          setPinTranscriptBottom(nearBottom);
         }}
         style={{
           width: '100%',
           overflowY: 'auto',
           paddingRight: 4,
+          maxHeight: 112,
+          borderBottom: '1px solid rgba(255,255,255,0.15)'
         }}
       >
-        {blocks.map((b) => (
-          <div key={b.id} style={{ whiteSpace: 'pre-wrap', marginBottom: 6 }}>
-            <span style={{ color: 'rgba(255,255,255,0.7)', marginRight: 8 }}>
-              [{new Date(b.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}]
-            </span>
-            <span>{b.text}</span>
-          </div>
-        ))}
-        {tblocks.length > 0 && (
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', marginTop: 6, paddingTop: 6 }} />
+        {blocks.length === 0 ? (
+          <div style={{ opacity: 0.8 }}>Transcript will appear here…</div>
+        ) : (
+          blocks.map((b) => (
+            <div key={b.id} style={{ whiteSpace: 'pre-wrap', marginBottom: 6 }}>
+              <span style={{ color: 'rgba(255,255,255,0.7)', marginRight: 8 }}>
+                [{new Date(b.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}]
+              </span>
+              <span>{b.text}</span>
+            </div>
+          ))
         )}
-        {tblocks.map((b) => (
-          <div key={`t-${b.id}`} style={{ whiteSpace: 'pre-wrap', marginBottom: 6 }}>
-            <span style={{ color: 'rgba(255,255,255,0.7)', marginRight: 8 }}>
-              [{new Date(b.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}]
-            </span>
-            <span style={{ opacity: 0.95 }}>{b.text}</span>
-          </div>
-        ))}
+      </div>
+
+      {/* Translation box (4 lines tall) */}
+      <div
+        ref={translationRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          const nearBottom = el.scrollHeight - (el.scrollTop + el.clientHeight) < 80;
+          setPinTranslationBottom(nearBottom);
+        }}
+        style={{
+          width: '100%',
+          overflowY: 'auto',
+          paddingRight: 4,
+          maxHeight: 112,
+        }}
+      >
+        {tblocks.length === 0 ? (
+          <div style={{ opacity: 0.8 }}>Translation will appear here…</div>
+        ) : (
+          tblocks.map((b) => (
+            <div key={`t-${b.id}`} style={{ whiteSpace: 'pre-wrap', marginBottom: 6 }}>
+              <span style={{ color: 'rgba(255,255,255,0.7)', marginRight: 8 }}>
+                [{new Date(b.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}]
+              </span>
+              <span style={{ opacity: 0.95 }}>{b.text}</span>
+            </div>
+          ))
+        )}
       </div>
     </div>,
     container,
