@@ -361,27 +361,32 @@ function HideAgentTiles() {
   React.useEffect(() => {
     if (typeof document === 'undefined') return;
     const hide = () => {
+      // 1) Hide agent tile defensively (if still rendered)
       document.querySelectorAll('.lk-participant-tile').forEach((el) => {
         const txt = el.textContent || '';
         if (/captions agent/i.test(txt)) {
           (el as HTMLElement).style.display = 'none';
         }
       });
-      // After hiding agent tiles, adjust grid column count to visible tiles
+      // 2) Adjust grid columns to the number of non-agent participants
+      const nonAgentCount = participants.filter((p) => !isAgentParticipant(p)).length;
       const grid = document.querySelector('.lk-grid-layout') as HTMLElement | null;
-      if (grid) {
-        const visibleTiles = Array.from(
-          document.querySelectorAll('.lk-participant-tile'),
-        ).filter((n) => (n as HTMLElement).style.display !== 'none').length;
-        if (visibleTiles > 0) {
-          grid.style.setProperty('--lk-col-count', String(Math.min(visibleTiles, 4)));
-        }
+      if (grid && nonAgentCount > 0) {
+        // Force override with !important to win against inline updates
+        grid.style.setProperty('--lk-col-count', String(Math.min(nonAgentCount, 4)), 'important');
       }
     };
     hide();
+    // Re-apply whenever the grid mutates (e.g., layout recalculates)
+    const grid = document.querySelector('.lk-grid-layout');
     const obs = new MutationObserver(hide);
-    obs.observe(document.body, { childList: true, subtree: true });
-    return () => obs.disconnect();
+    if (grid) obs.observe(grid, { attributes: true, childList: true, subtree: true });
+    const bodyObs = new MutationObserver(hide);
+    bodyObs.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      obs.disconnect();
+      bodyObs.disconnect();
+    };
   }, [participants]);
   return null;
 }
