@@ -217,10 +217,14 @@ function VideoConferenceComponent(props: {
   }, [lowPowerMode]);
 
   return (
-    <div className="lk-room-container">
+    <div className="lk-room-container" style={{ position: 'relative' }}>
       <RoomContext.Provider value={room}>
         <KeyboardShortcuts />
-        <MeetingWithCaptions room={room} />
+        <VideoConference
+          chatMessageFormatter={formatChatMessageLinks}
+          SettingsComponent={SHOW_SETTINGS_MENU ? SettingsMenu : undefined}
+        />
+        <CaptionsOverlay room={room} />
         <DebugMode />
         <RecordingIndicator />
       </RoomContext.Provider>
@@ -228,7 +232,7 @@ function VideoConferenceComponent(props: {
   );
 }
 
-function MeetingWithCaptions(props: { room: Room }) {
+function CaptionsOverlay(props: { room: Room }) {
   const { room } = props;
   const [messages, setMessages] = React.useState<
     Array<{ id: string; type: 'transcription' | 'translation'; speaker?: string; text?: string; originalText?: string; translatedText?: string; timestamp?: string }>
@@ -263,45 +267,46 @@ function MeetingWithCaptions(props: { room: Room }) {
   }, [room]);
 
   return (
-    <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <VideoConference
-          chatMessageFormatter={formatChatMessageLinks}
-          SettingsComponent={SHOW_SETTINGS_MENU ? SettingsMenu : undefined}
-        />
-      </div>
-      <div
-        style={{
-          width: 320,
-          maxWidth: '33%',
-          borderLeft: '1px solid var(--lk-border-color, #2a2a2a)',
-          paddingLeft: 12,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-        }}
-      >
-        <div style={{ fontWeight: 600 }}>Transcribe & Translate</div>
-        <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 180px)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {messages.map((m) => (
-            <div key={m.id} style={{ fontSize: 14, lineHeight: 1.4 }}>
-              {m.type === 'transcription' ? (
-                <>
-                  <span style={{ opacity: 0.7 }}>{m.speaker ?? 'Speaker'}:</span> {m.text}
-                </>
-              ) : (
-                <>
-                  <span style={{ opacity: 0.7 }}>Translation</span>
-                  {m.originalText ? <span style={{ opacity: 0.5 }}> — {m.originalText}</span> : null}
-                  {': '} {m.translatedText}
-                </>
-              )}
-            </div>
-          ))}
-          {messages.length === 0 && (
-            <div style={{ opacity: 0.6, fontSize: 13 }}>Waiting for captions…</div>
-          )}
-        </div>
+    <div
+      style={{
+        position: 'absolute',
+        right: 12,
+        top: 96,
+        bottom: 12,
+        width: 320,
+        maxWidth: '33%',
+        background: 'rgba(0,0,0,0.35)',
+        backdropFilter: 'blur(6px)',
+        border: '1px solid var(--lk-border-color, #2a2a2a)',
+        borderRadius: 8,
+        padding: 12,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        pointerEvents: 'auto',
+      }}
+    >
+      <div style={{ fontWeight: 600 }}>Transcribe & Translate</div>
+      <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {messages.map((m) => (
+          <div key={m.id} style={{ fontSize: 14, lineHeight: 1.4 }}>
+            {m.type === 'transcription' ? (
+              <>
+                <span style={{ opacity: 0.7 }}>{m.speaker ?? 'Speaker'}:</span> {m.text}
+              </>
+            ) : (
+              <>
+                <span style={{ opacity: 0.7 }}>Translation</span>
+                {m.originalText ? <span style={{ opacity: 0.5 }}> — {m.originalText}</span> : null}
+                {': '} {m.translatedText}
+              </>
+            )}
+          </div>
+        ))}
+        {messages.length === 0 && (
+          <div style={{ opacity: 0.6, fontSize: 13 }}>Waiting for captions…</div>
+        )}
       </div>
     </div>
   );
