@@ -268,18 +268,21 @@ function CaptionsChatBridge(props: { room: Room }) {
       payload: Uint8Array,
       _participant?: any,
       _kind?: any,
-      _topic?: string,
+      topic?: string,
     ) => {
+      // Bridge only captions topic messages
+      if (topic !== 'captions') return;
       try {
-        const text = new TextDecoder().decode(payload);
-        if (text.startsWith('[Transcript]') || text.startsWith('[Translation]')) {
-          // Echo into chat so LiveKit Components renders it in the chat panel
-          room.localParticipant
-            .sendChatMessage(text)
-            .catch(() => void 0);
+        const json = JSON.parse(new TextDecoder().decode(payload));
+        if (json?.type === 'transcription') {
+          const text = `[Transcript] ${json.speaker ?? 'Speaker'}: ${json.text ?? ''}`;
+          room.localParticipant.sendChatMessage(text).catch(() => void 0);
+        } else if (json?.type === 'translation') {
+          const text = `[Translation] ${json.speaker ?? 'Speaker'}: ${json.translatedText ?? ''}`;
+          room.localParticipant.sendChatMessage(text).catch(() => void 0);
         }
       } catch {
-        // ignore
+        // ignore non-JSON
       }
     };
     room.on(RoomEvent.DataReceived, onData);
