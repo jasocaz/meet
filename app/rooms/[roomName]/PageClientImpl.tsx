@@ -479,16 +479,42 @@ function CaptionsTilesOverlay(props: { room: Room }) {
 
 function CaptionPortal(props: { identity: string; text: string }) {
   const { identity, text } = props;
+  const participants = useParticipants();
   const [container, setContainer] = React.useState<Element | null>(null);
   React.useEffect(() => {
     if (typeof document === 'undefined') return;
-    const esc = (window as any).CSS?.escape ? (window as any).CSS.escape(identity) : identity.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
-    const sel = `.lk-participant-tile[data-lk-identity="${esc}"]`;
+    const escId = (window as any).CSS?.escape
+      ? (window as any).CSS.escape(identity)
+      : identity.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
     const tryFind = () => {
-      const el = document.querySelector(sel);
-      if (el) {
-        const h = el as HTMLElement;
-        // Ensure tile can host absolutely positioned overlay
+      // 1) Preferred: tile exposes data-lk-identity
+      let tile: Element | null = document.querySelector(
+        `.lk-participant-tile[data-lk-identity="${escId}"]`,
+      );
+
+      // 2) Fallback: find by participant-name span when tile lacks identity attrs
+      if (!tile) {
+        const p = participants.find((pp) => pp.identity === identity);
+        const displayName = p?.name ?? identity.split('__')[0];
+        if (displayName) {
+          const escName = (window as any).CSS?.escape
+            ? (window as any).CSS.escape(displayName)
+            : displayName.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+          const nameEl =
+            document.querySelector(
+              `.lk-participant-name[data-lk-participant-name="${escName}"]`,
+            ) ||
+            Array.from(document.querySelectorAll('.lk-participant-name')).find(
+              (el) => el.textContent?.trim().toLowerCase() === displayName.toLowerCase(),
+            ) || null;
+          if (nameEl) {
+            tile = (nameEl as HTMLElement).closest('.lk-participant-tile');
+          }
+        }
+      }
+
+      if (tile) {
+        const h = tile as HTMLElement;
         if (getComputedStyle(h).position === 'static') {
           h.style.position = 'relative';
           h.style.overflow = 'visible';
@@ -500,7 +526,7 @@ function CaptionPortal(props: { identity: string; text: string }) {
     const obs = new MutationObserver(tryFind);
     obs.observe(document.body, { childList: true, subtree: true });
     return () => obs.disconnect();
-  }, [identity]);
+  }, [identity, participants]);
 
   if (!container) return null;
   return createPortal(
