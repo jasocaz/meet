@@ -29,6 +29,7 @@ import {
   VideoCaptureOptions,
 } from 'livekit-client';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import { useSetupE2EE } from '@/lib/useSetupE2EE';
 import { useLowCPUOptimizer } from '@/lib/usePerfomanceOptimiser';
 
@@ -256,7 +257,7 @@ function VideoConferenceComponent(props: {
           chatMessageFormatter={chatFormatter}
           SettingsComponent={SHOW_SETTINGS_MENU ? SettingsMenu : undefined}
         />
-        <TranscribingPill />
+        <TranscribingPillInControlBar />
         <DebugMode />
         <RecordingIndicator />
       </RoomContext.Provider>
@@ -311,21 +312,14 @@ function isAgentParticipant(p: any): boolean {
   );
 }
 
-function TranscribingPill() {
+function TranscribingPillInControlBar() {
   const participants = useParticipants();
   const agentPresent = participants.some((p) => isAgentParticipant(p));
-  const activeStyle = agentPresent
-    ? {
-        border: '2px solid #e5484d',
-        color: '#e5484d',
-        background: 'rgba(229,72,77,0.08)',
-      }
-    : {
-        border: '1px solid rgba(255,255,255,0.2)',
-        color: 'rgba(255,255,255,0.8)',
-        background: 'rgba(255,255,255,0.06)',
-      };
-  return (
+  const container = React.useMemo(() => {
+    if (typeof document === 'undefined') return null;
+    return document.querySelector('.lk-control-bar');
+  }, []);
+  const pill = (
     <div
       aria-label="Transcribing"
       style={{
@@ -333,13 +327,16 @@ function TranscribingPill() {
         padding: '8px 14px',
         borderRadius: 8,
         userSelect: 'none',
-        position: 'absolute',
-        left: 12,
-        bottom: 72,
-        ...activeStyle,
+        order: -1,
+        marginRight: 12,
+        border: agentPresent ? '2px solid #e5484d' : '1px solid rgba(255,255,255,0.2)',
+        color: agentPresent ? '#e5484d' : 'rgba(255,255,255,0.8)',
+        background: agentPresent ? 'rgba(229,72,77,0.08)' : 'rgba(255,255,255,0.06)',
       }}
     >
       {agentPresent ? 'Transcribing' : 'Transcribing (off)'}
     </div>
   );
+  if (container) return createPortal(pill, container);
+  return null;
 }
