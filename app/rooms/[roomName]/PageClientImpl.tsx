@@ -447,7 +447,15 @@ function CaptionPortal(props: { identity: string; text: string }) {
     const sel = `.lk-participant-tile[data-lk-identity="${esc}"]`;
     const tryFind = () => {
       const el = document.querySelector(sel);
-      if (el) setContainer(el);
+      if (el) {
+        const h = el as HTMLElement;
+        // Ensure tile can host absolutely positioned overlay
+        if (getComputedStyle(h).position === 'static') {
+          h.style.position = 'relative';
+          h.style.overflow = 'visible';
+        }
+        setContainer(h);
+      }
     };
     tryFind();
     const obs = new MutationObserver(tryFind);
@@ -463,6 +471,7 @@ function CaptionPortal(props: { identity: string; text: string }) {
         left: 12,
         right: 12,
         bottom: 48,
+        zIndex: 9999,
         padding: '6px 10px',
         borderRadius: 8,
         background: 'rgba(0,0,0,0.55)',
