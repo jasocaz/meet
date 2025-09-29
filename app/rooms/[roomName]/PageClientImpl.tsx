@@ -216,98 +216,46 @@ function VideoConferenceComponent(props: {
     }
   }, [lowPowerMode]);
 
+  const chatFormatter = React.useCallback(
+    (message: string) => {
+      const base = formatChatMessageLinks(message);
+      const isTranscript = message.startsWith('[Transcript]');
+      const isTranslation = message.startsWith('[Translation]');
+      if (!isTranscript && !isTranslation) return base;
+      const label = isTranscript ? 'Transcript' : 'Translation';
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span
+            style={{
+              fontSize: 11,
+              lineHeight: 1,
+              padding: '2px 6px',
+              borderRadius: 6,
+              background: 'rgba(0,0,0,0.35)',
+              border: '1px solid var(--lk-border-color, #2a2a2a)',
+              opacity: 0.8,
+            }}
+          >
+            {label}
+          </span>
+          {base}
+        </span>
+      );
+    },
+    []
+  );
+
   return (
     <div className="lk-room-container" style={{ position: 'relative' }}>
       <RoomContext.Provider value={room}>
         <KeyboardShortcuts />
         <VideoConference
-          chatMessageFormatter={formatChatMessageLinks}
+          chatMessageFormatter={chatFormatter}
           SettingsComponent={SHOW_SETTINGS_MENU ? SettingsMenu : undefined}
         />
-        <CaptionsOverlay room={room} />
         <DebugMode />
         <RecordingIndicator />
       </RoomContext.Provider>
-    </div>
-  );
-}
-
-function CaptionsOverlay(props: { room: Room }) {
-  const { room } = props;
-  const [messages, setMessages] = React.useState<
-    Array<{ id: string; type: 'transcription' | 'translation'; speaker?: string; text?: string; originalText?: string; translatedText?: string; timestamp?: string }>
-  >([]);
-
-  React.useEffect(() => {
-    const onData = (payload: Uint8Array) => {
-      try {
-        const json = JSON.parse(new TextDecoder().decode(payload));
-        if (json && (json.type === 'transcription' || json.type === 'translation')) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-              type: json.type,
-              speaker: json.speaker,
-              text: json.text,
-              originalText: json.originalText,
-              translatedText: json.translatedText,
-              timestamp: json.timestamp,
-            },
-          ]);
-        }
-      } catch (e) {
-        // ignore non-JSON data packets
-      }
-    };
-    room.on(RoomEvent.DataReceived, onData);
-    return () => {
-      room.off(RoomEvent.DataReceived, onData);
-    };
-  }, [room]);
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        right: 12,
-        top: 96,
-        bottom: 12,
-        width: 320,
-        maxWidth: '33%',
-        background: 'rgba(0,0,0,0.35)',
-        backdropFilter: 'blur(6px)',
-        border: '1px solid var(--lk-border-color, #2a2a2a)',
-        borderRadius: 8,
-        padding: 12,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        pointerEvents: 'auto',
-      }}
-    >
-      <div style={{ fontWeight: 600 }}>Transcribe & Translate</div>
-      <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {messages.map((m) => (
-          <div key={m.id} style={{ fontSize: 14, lineHeight: 1.4 }}>
-            {m.type === 'transcription' ? (
-              <>
-                <span style={{ opacity: 0.7 }}>{m.speaker ?? 'Speaker'}:</span> {m.text}
-              </>
-            ) : (
-              <>
-                <span style={{ opacity: 0.7 }}>Translation</span>
-                {m.originalText ? <span style={{ opacity: 0.5 }}> — {m.originalText}</span> : null}
-                {': '} {m.translatedText}
-              </>
-            )}
-          </div>
-        ))}
-        {messages.length === 0 && (
-          <div style={{ opacity: 0.6, fontSize: 13 }}>Waiting for captions…</div>
-        )}
-      </div>
     </div>
   );
 }
