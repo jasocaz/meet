@@ -15,7 +15,7 @@ import {
   VideoConference,
   useParticipants,
   GridLayout,
-  ParticipantTile,
+  useTracks,
   ControlBar,
   RoomAudioRenderer,
   Chat,
@@ -322,14 +322,12 @@ function isAgentParticipant(p: any): boolean {
 
 function FilteredGrid() {
   const participants = useParticipants();
-  const visible = React.useMemo(() => participants.filter((p) => !isAgentParticipant(p)), [participants]);
-  return (
-    <GridLayout>
-      {visible.map((p) => (
-        <ParticipantTile key={p.sid} participant={p} />
-      ))}
-    </GridLayout>
+  const tracks = useTracks([Track.Source.Camera, Track.Source.ScreenShare]);
+  const filteredTracks = React.useMemo(
+    () => tracks.filter((t) => !isAgentParticipant(t.participant)),
+    [tracks, participants],
   );
+  return <GridLayout tracks={filteredTracks} />;
 }
 
 function TranscribingPill() {
