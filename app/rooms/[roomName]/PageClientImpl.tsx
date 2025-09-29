@@ -22,6 +22,7 @@ import {
 } from '@livekit/components-react';
 import {
   ExternalE2EEKeyProvider,
+  Track,
   RoomOptions,
   VideoCodec,
   VideoPresets,
