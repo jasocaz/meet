@@ -406,9 +406,15 @@ function CaptionsTilesOverlay(props: { room: Room }) {
       const starts = participants.find((p) => p.identity?.startsWith(base));
       if (starts) return starts.identity;
       const byName = participants.find((p) => p.name?.toLowerCase() === base);
-      return byName?.identity;
+      if (byName?.identity) return byName.identity;
+      // Fallback: attach to local participant tile so text is visible somewhere
+      try {
+        return (room.localParticipant as any)?.identity as string | undefined;
+      } catch {
+        return undefined;
+      }
     },
-    [participants],
+    [participants, room],
   );
 
   React.useEffect(() => {
@@ -419,6 +425,11 @@ function CaptionsTilesOverlay(props: { room: Room }) {
       topic?: string,
     ) => {
       const text = new TextDecoder().decode(payload);
+      // Debug: log incoming captions payloads (temporary)
+      try {
+        // eslint-disable-next-line no-console
+        console.debug('captions data', { topic, text });
+      } catch {}
       // Primary: JSON on 'captions'
       if (topic === 'captions') {
         try {
@@ -446,7 +457,7 @@ function CaptionsTilesOverlay(props: { room: Room }) {
         const now = Date.now();
         const next: Record<string, { text: string; ts: number }> = {};
         for (const [id, v] of Object.entries(prev)) {
-          if (now - v.ts < 6000) next[id] = v;
+          if (now - v.ts < 10000) next[id] = v;
         }
         return next;
       });
