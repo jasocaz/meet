@@ -220,13 +220,89 @@ function VideoConferenceComponent(props: {
     <div className="lk-room-container">
       <RoomContext.Provider value={room}>
         <KeyboardShortcuts />
+        <MeetingWithCaptions room={room} />
+        <DebugMode />
+        <RecordingIndicator />
+      </RoomContext.Provider>
+    </div>
+  );
+}
+
+function MeetingWithCaptions(props: { room: Room }) {
+  const { room } = props;
+  const [messages, setMessages] = React.useState<
+    Array<{ id: string; type: 'transcription' | 'translation'; speaker?: string; text?: string; originalText?: string; translatedText?: string; timestamp?: string }>
+  >([]);
+
+  React.useEffect(() => {
+    const onData = (payload: Uint8Array) => {
+      try {
+        const json = JSON.parse(new TextDecoder().decode(payload));
+        if (json && (json.type === 'transcription' || json.type === 'translation')) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              type: json.type,
+              speaker: json.speaker,
+              text: json.text,
+              originalText: json.originalText,
+              translatedText: json.translatedText,
+              timestamp: json.timestamp,
+            },
+          ]);
+        }
+      } catch (e) {
+        // ignore non-JSON data packets
+      }
+    };
+    room.on(RoomEvent.DataReceived, onData);
+    return () => {
+      room.off(RoomEvent.DataReceived, onData);
+    };
+  }, [room]);
+
+  return (
+    <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <VideoConference
           chatMessageFormatter={formatChatMessageLinks}
           SettingsComponent={SHOW_SETTINGS_MENU ? SettingsMenu : undefined}
         />
-        <DebugMode />
-        <RecordingIndicator />
-      </RoomContext.Provider>
+      </div>
+      <div
+        style={{
+          width: 320,
+          maxWidth: '33%',
+          borderLeft: '1px solid var(--lk-border-color, #2a2a2a)',
+          paddingLeft: 12,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <div style={{ fontWeight: 600 }}>Transcribe & Translate</div>
+        <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 180px)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {messages.map((m) => (
+            <div key={m.id} style={{ fontSize: 14, lineHeight: 1.4 }}>
+              {m.type === 'transcription' ? (
+                <>
+                  <span style={{ opacity: 0.7 }}>{m.speaker ?? 'Speaker'}:</span> {m.text}
+                </>
+              ) : (
+                <>
+                  <span style={{ opacity: 0.7 }}>Translation</span>
+                  {m.originalText ? <span style={{ opacity: 0.5 }}> — {m.originalText}</span> : null}
+                  {': '} {m.translatedText}
+                </>
+              )}
+            </div>
+          ))}
+          {messages.length === 0 && (
+            <div style={{ opacity: 0.6, fontSize: 13 }}>Waiting for captions…</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
