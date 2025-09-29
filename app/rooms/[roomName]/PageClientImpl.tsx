@@ -492,39 +492,26 @@ function CaptionsTilesOverlay(props: { room: Room }) {
       }
     };
     room.on(RoomEvent.DataReceived, onData);
-    const interval = window.setInterval(() => {
-      // prune: drop old blocks beyond window and stale speakers
-      setByIdentity((prev) => {
-        const now = Date.now();
-        const next: Record<string, SpeakerState> = {};
-        for (const [id, state] of Object.entries(prev)) {
-          const prunedBlocks = state.blocks.filter((b) => now - b.ts < 12000);
-          if (prunedBlocks.length > 0 || state.partial) {
-            next[id] = { ...state, blocks: prunedBlocks };
-          }
-        }
-        return next;
-      });
-    }, 2000);
     return () => {
       room.off(RoomEvent.DataReceived, onData);
-      window.clearInterval(interval);
     };
   }, [room]);
 
   return (
     <>
       {Object.entries(byIdentity).map(([identity, v]) => (
-        <CaptionPortal key={identity} identity={identity} text={v.blocks.slice(-2).map(b => b.text).join('\n')} />)
+        <CaptionPortal key={identity} identity={identity} blocks={v.blocks} />)
       )}
     </>
   );
 }
 
-function CaptionPortal(props: { identity: string; text: string }) {
-  const { identity, text } = props;
+function CaptionPortal(props: { identity: string; blocks: { id: number; ts: number; text: string }[] }) {
+  const { identity, blocks } = props;
   const participants = useParticipants();
   const [container, setContainer] = React.useState<Element | null>(null);
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
+  const [pinBottom, setPinBottom] = React.useState(true);
   React.useEffect(() => {
     if (typeof document === 'undefined') return;
     const escId = (window as any).CSS?.escape
@@ -572,6 +559,17 @@ function CaptionPortal(props: { identity: string; text: string }) {
     return () => obs.disconnect();
   }, [identity, participants]);
 
+  React.useEffect(() => {
+    if (!contentRef.current || !pinBottom) return;
+    const el = contentRef.current;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+      setTimeout(() => {
+        el.scrollTop = el.scrollHeight;
+      }, 0);
+    });
+  }, [blocks, pinBottom]);
+
   if (!container) return null;
   return createPortal(
     <div
@@ -585,18 +583,40 @@ function CaptionPortal(props: { identity: string; text: string }) {
         borderRadius: 10,
         background: 'rgba(0,0,0,0.55)',
         color: 'white',
-        pointerEvents: 'none',
-        fontSize: 16,
-        lineHeight: 1.35,
-        textAlign: 'center',
+        pointerEvents: 'auto',
+        fontSize: 15,
+        lineHeight: 1.4,
+        textAlign: 'left',
         minHeight: 110,
+        maxHeight: 200,
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        alignItems: 'stretch',
+        justifyContent: 'stretch',
         overflow: 'hidden',
       }}
     >
-      {text}
+      <div
+        ref={contentRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          const nearBottom = el.scrollHeight - (el.scrollTop + el.clientHeight) < 80;
+          setPinBottom(nearBottom);
+        }}
+        style={{
+          width: '100%',
+          overflowY: 'auto',
+          paddingRight: 4,
+        }}
+      >
+        {blocks.map((b) => (
+          <div key={b.id} style={{ whiteSpace: 'pre-wrap', marginBottom: 6 }}>
+            <span style={{ color: 'rgba(255,255,255,0.7)', marginRight: 8 }}>
+              [{new Date(b.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}]
+            </span>
+            <span>{b.text}</span>
+          </div>
+        ))}
+      </div>
     </div>,
     container,
   );
