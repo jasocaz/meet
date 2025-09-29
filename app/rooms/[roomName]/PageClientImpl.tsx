@@ -30,7 +30,6 @@ import {
 } from 'livekit-client';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
-import { useParticipants } from '@livekit/components-react';
 import { useSetupE2EE } from '@/lib/useSetupE2EE';
 import { useLowCPUOptimizer } from '@/lib/usePerfomanceOptimiser';
 
