@@ -254,7 +254,6 @@ function VideoConferenceComponent(props: {
         <KeyboardShortcuts />
         <CaptionsChatBridge room={room} />
         <HideAgentTiles />
-        <SimpleTileOverlays />
         <VideoConference
           chatMessageFormatter={chatFormatter}
           SettingsComponent={SHOW_SETTINGS_MENU ? SettingsMenu : undefined}
@@ -501,14 +500,19 @@ function CaptionPortal(props: { identity: string; text: string }) {
         right: 12,
         top: 12,
         zIndex: 9999,
-        padding: '6px 10px',
-        borderRadius: 8,
-        background: 'rgba(0,0,0,0.4)',
+        padding: '10px 12px',
+        borderRadius: 10,
+        background: 'rgba(0,0,0,0.55)',
         color: 'white',
         pointerEvents: 'none',
-        fontSize: 14,
+        fontSize: 16,
         lineHeight: 1.35,
         textAlign: 'center',
+        minHeight: 110,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
       }}
     >
       {text}
@@ -517,54 +521,4 @@ function CaptionPortal(props: { identity: string; text: string }) {
   );
 }
 
-function SimpleTileOverlays() {
-  const [tiles, setTiles] = React.useState<Element[]>([]);
-  React.useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const refresh = () => {
-      const list = Array.from(document.querySelectorAll('.lk-participant-tile'));
-      setTiles(list);
-      // ensure host can render absolute child
-      list.forEach((el) => {
-        const h = el as HTMLElement;
-        if (getComputedStyle(h).position === 'static') {
-          h.style.position = 'relative';
-          h.style.overflow = 'visible';
-        }
-      });
-    };
-    refresh();
-    const obs = new MutationObserver(refresh);
-    obs.observe(document.body, { childList: true, subtree: true });
-    return () => obs.disconnect();
-  }, []);
-
-  return (
-    <>
-      {tiles.map((el, i) =>
-        createPortal(
-          <div
-            key={i}
-            style={{
-              position: 'absolute',
-              left: 12,
-              right: 12,
-              top: 12,
-              zIndex: 9999,
-              padding: '4px 8px',
-              borderRadius: 6,
-              background: 'rgba(0,0,0,0.25)',
-              color: 'white',
-              pointerEvents: 'none',
-              fontSize: 12,
-              textAlign: 'center',
-            }}
-          >
-            Overlay test
-          </div>,
-          el,
-        ),
-      )}
-    </>
-  );
-}
+// (test overlay removed; using real transcript overlays below)
