@@ -396,7 +396,8 @@ function CaptionsTilesOverlay(props: { room: Room }) {
   const { room } = props;
   type Block = { id: number; ts: number; text: string };
   type SpeakerState = {
-    blocks: Block[]; // finalized blocks
+    blocks: Block[]; // transcript finalized blocks
+    tblocks: Block[]; // translation finalized blocks
     partial?: string; // reserved if we ever pass interim text via LiveKit
     lastIdx: number; // cumulative length tracker if needed in future
   };
@@ -447,7 +448,7 @@ function CaptionsTilesOverlay(props: { room: Room }) {
             if (id && slice) {
               setByIdentity((prev) => {
                 const now = Date.now();
-                const cur = prev[id] ?? { blocks: [], lastIdx: 0 };
+                const cur = prev[id] ?? { blocks: [], tblocks: [], lastIdx: 0 };
                 const blocks = cur.blocks;
                 const last = blocks[blocks.length - 1];
                 const isTiny = slice.split(/\s+/).length < 4;
@@ -459,6 +460,27 @@ function CaptionsTilesOverlay(props: { room: Room }) {
                 }
                 const newBlock: Block = { id: nextIdRef.current++, ts: now, text: slice };
                 return { ...prev, [id]: { ...cur, blocks: [...blocks, newBlock] } };
+              });
+            }
+          }
+          else if (json?.type === 'translation') {
+            const id = resolveIdentity(json.speaker);
+            const slice = String(json.translatedText ?? json.text ?? '').trim();
+            if (id && slice) {
+              setByIdentity((prev) => {
+                const now = Date.now();
+                const cur = prev[id] ?? { blocks: [], tblocks: [], lastIdx: 0 };
+                const blocks = cur.tblocks;
+                const last = blocks[blocks.length - 1];
+                const isTiny = slice.split(/\s+/).length < 4;
+                const endsSentence = /[.!?…]$/.test(last?.text || '');
+                const gapShort = last ? now - last.ts < 1200 : false;
+                if (last && (gapShort || !endsSentence) && isTiny) {
+                  const merged = { ...last, ts: now, text: (last.text + ' ' + slice).trim() };
+                  return { ...prev, [id]: { ...cur, tblocks: [...blocks.slice(0, -1), merged] } };
+                }
+                const newBlock: Block = { id: nextIdRef.current++, ts: now, text: slice };
+                return { ...prev, [id]: { ...cur, tblocks: [...blocks, newBlock] } };
               });
             }
           }
@@ -474,7 +496,7 @@ function CaptionsTilesOverlay(props: { room: Room }) {
           if (id && slice) {
             setByIdentity((prev) => {
               const now = Date.now();
-              const cur = prev[id] ?? { blocks: [], lastIdx: 0 };
+              const cur = prev[id] ?? { blocks: [], tblocks: [], lastIdx: 0 };
               const blocks = cur.blocks;
               const last = blocks[blocks.length - 1];
               const isTiny = slice.split(/\s+/).length < 4;
@@ -490,6 +512,30 @@ function CaptionsTilesOverlay(props: { room: Room }) {
           }
         }
       }
+      if (text.startsWith('[Translation]')) {
+        const m = text.match(/^\[Translation\]\s+([^:]+):\s*(.*)$/);
+        if (m) {
+          const id = resolveIdentity(m[1]);
+          const slice = (m[2] || '').trim();
+          if (id && slice) {
+            setByIdentity((prev) => {
+              const now = Date.now();
+              const cur = prev[id] ?? { blocks: [], tblocks: [], lastIdx: 0 };
+              const blocks = cur.tblocks;
+              const last = blocks[blocks.length - 1];
+              const isTiny = slice.split(/\s+/).length < 4;
+              const endsSentence = /[.!?…]$/.test(last?.text || '');
+              const gapShort = last ? now - last.ts < 1200 : false;
+              if (last && (gapShort || !endsSentence) && isTiny) {
+                const merged = { ...last, ts: now, text: (last.text + ' ' + slice).trim() };
+                return { ...prev, [id]: { ...cur, tblocks: [...blocks.slice(0, -1), merged] } };
+              }
+              const newBlock: Block = { id: nextIdRef.current++, ts: now, text: slice };
+              return { ...prev, [id]: { ...cur, tblocks: [...blocks, newBlock] } };
+            });
+          }
+        }
+      }
     };
     room.on(RoomEvent.DataReceived, onData);
     return () => {
@@ -500,14 +546,14 @@ function CaptionsTilesOverlay(props: { room: Room }) {
   return (
     <>
       {Object.entries(byIdentity).map(([identity, v]) => (
-        <CaptionPortal key={identity} identity={identity} blocks={v.blocks} />)
+        <CaptionPortal key={identity} identity={identity} blocks={v.blocks} tblocks={v.tblocks} />)
       )}
     </>
   );
 }
 
-function CaptionPortal(props: { identity: string; blocks: { id: number; ts: number; text: string }[] }) {
-  const { identity, blocks } = props;
+function CaptionPortal(props: { identity: string; blocks: { id: number; ts: number; text: string }[]; tblocks: { id: number; ts: number; text: string }[] }) {
+  const { identity, blocks, tblocks } = props;
   const participants = useParticipants();
   const [container, setContainer] = React.useState<Element | null>(null);
   const contentRef = React.useRef<HTMLDivElement | null>(null);
@@ -568,7 +614,7 @@ function CaptionPortal(props: { identity: string; blocks: { id: number; ts: numb
         el.scrollTop = el.scrollHeight;
       }, 0);
     });
-  }, [blocks, pinBottom]);
+  }, [blocks, tblocks, pinBottom]);
 
   if (!container) return null;
   return createPortal(
@@ -588,7 +634,7 @@ function CaptionPortal(props: { identity: string; blocks: { id: number; ts: numb
         lineHeight: 1.4,
         textAlign: 'left',
         minHeight: 110,
-        maxHeight: 200,
+        maxHeight: 112, // ~4 lines tall; scrollable
         display: 'flex',
         alignItems: 'stretch',
         justifyContent: 'stretch',
@@ -614,6 +660,17 @@ function CaptionPortal(props: { identity: string; blocks: { id: number; ts: numb
               [{new Date(b.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}]
             </span>
             <span>{b.text}</span>
+          </div>
+        ))}
+        {tblocks.length > 0 && (
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', marginTop: 6, paddingTop: 6 }} />
+        )}
+        {tblocks.map((b) => (
+          <div key={`t-${b.id}`} style={{ whiteSpace: 'pre-wrap', marginBottom: 6 }}>
+            <span style={{ color: 'rgba(255,255,255,0.7)', marginRight: 8 }}>
+              [{new Date(b.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}]
+            </span>
+            <span style={{ opacity: 0.95 }}>{b.text}</span>
           </div>
         ))}
       </div>
