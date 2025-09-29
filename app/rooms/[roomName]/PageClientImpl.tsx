@@ -13,6 +13,12 @@ import {
   PreJoin,
   RoomContext,
   VideoConference,
+  useParticipants,
+  GridLayout,
+  ParticipantTile,
+  ControlBar,
+  RoomAudioRenderer,
+  Chat,
 } from '@livekit/components-react';
 import {
   ExternalE2EEKeyProvider,
@@ -249,11 +255,17 @@ function VideoConferenceComponent(props: {
     <div className="lk-room-container" style={{ position: 'relative' }}>
       <RoomContext.Provider value={room}>
         <KeyboardShortcuts />
+        <RoomAudioRenderer />
         <CaptionsChatBridge room={room} />
-        <VideoConference
-          chatMessageFormatter={chatFormatter}
-          SettingsComponent={SHOW_SETTINGS_MENU ? SettingsMenu : undefined}
-        />
+        <FilteredGrid />
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 12px' }}>
+          <TranscribingPill />
+          <div style={{ flex: 1 }} />
+          <ControlBar />
+        </div>
+        <div style={{ position: 'absolute', right: 12, bottom: 76, width: 360, maxWidth: '40%' }}>
+          <Chat messageFormatter={chatFormatter} />
+        </div>
         <DebugMode />
         <RecordingIndicator />
       </RoomContext.Provider>
@@ -291,4 +303,61 @@ function CaptionsChatBridge(props: { room: Room }) {
     };
   }, [room]);
   return null;
+}
+
+function isAgentParticipant(p: any): boolean {
+  try {
+    if (typeof p?.metadata === 'string' && p.metadata) {
+      const meta = JSON.parse(p.metadata);
+      if (meta?.role === 'agent' || meta?.subtype === 'captions') return true;
+    }
+  } catch {}
+  const name: string | undefined = (p as any)?.name;
+  const identity: string | undefined = (p as any)?.identity;
+  return (
+    (name && name.toLowerCase().includes('captions')) ||
+    (identity && identity.startsWith('captions-agent'))
+  );
+}
+
+function FilteredGrid() {
+  const participants = useParticipants();
+  const visible = React.useMemo(() => participants.filter((p) => !isAgentParticipant(p)), [participants]);
+  return (
+    <GridLayout>
+      {visible.map((p) => (
+        <ParticipantTile key={p.sid} participant={p} />
+      ))}
+    </GridLayout>
+  );
+}
+
+function TranscribingPill() {
+  const participants = useParticipants();
+  const agentPresent = participants.some((p) => isAgentParticipant(p));
+  const activeStyle = agentPresent
+    ? {
+        border: '2px solid #e5484d',
+        color: '#e5484d',
+        background: 'rgba(229,72,77,0.08)',
+      }
+    : {
+        border: '1px solid rgba(255,255,255,0.2)',
+        color: 'rgba(255,255,255,0.8)',
+        background: 'rgba(255,255,255,0.06)',
+      };
+  return (
+    <div
+      aria-label="Transcribing"
+      style={{
+        fontSize: 14,
+        padding: '8px 14px',
+        borderRadius: 8,
+        userSelect: 'none',
+        ...activeStyle,
+      }}
+    >
+      {agentPresent ? 'Transcribing' : 'Transcribing (off)'}
+    </div>
+  );
 }
