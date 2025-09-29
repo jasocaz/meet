@@ -394,8 +394,15 @@ function HideAgentTiles() {
 
 function CaptionsTilesOverlay(props: { room: Room }) {
   const { room } = props;
-  const [byIdentity, setByIdentity] = React.useState<Record<string, { text: string; ts: number }>>({});
+  type Block = { id: number; ts: number; text: string };
+  type SpeakerState = {
+    blocks: Block[]; // finalized blocks
+    partial?: string; // reserved if we ever pass interim text via LiveKit
+    lastIdx: number; // cumulative length tracker if needed in future
+  };
+  const [byIdentity, setByIdentity] = React.useState<Record<string, SpeakerState>>({});
   const participants = useParticipants();
+  const nextIdRef = React.useRef(1);
 
   const resolveIdentity = React.useCallback(
     (speaker: string | undefined): string | undefined => {
@@ -436,7 +443,24 @@ function CaptionsTilesOverlay(props: { room: Room }) {
           const json = JSON.parse(text);
           if (json?.type === 'transcription') {
             const id = resolveIdentity(json.speaker);
-            if (id) setByIdentity((prev) => ({ ...prev, [id]: { text: json.text ?? '', ts: Date.now() } }));
+            const slice = String(json.text ?? '').trim();
+            if (id && slice) {
+              setByIdentity((prev) => {
+                const now = Date.now();
+                const cur = prev[id] ?? { blocks: [], lastIdx: 0 };
+                const blocks = cur.blocks;
+                const last = blocks[blocks.length - 1];
+                const isTiny = slice.split(/\s+/).length < 4;
+                const endsSentence = /[.!?…]$/.test(last?.text || '');
+                const gapShort = last ? now - last.ts < 1200 : false;
+                if (last && (gapShort || !endsSentence) && isTiny) {
+                  const merged = { ...last, ts: now, text: (last.text + ' ' + slice).trim() };
+                  return { ...prev, [id]: { ...cur, blocks: [...blocks.slice(0, -1), merged] } };
+                }
+                const newBlock: Block = { id: nextIdRef.current++, ts: now, text: slice };
+                return { ...prev, [id]: { ...cur, blocks: [...blocks, newBlock] } };
+              });
+            }
           }
           return;
         } catch {}
@@ -446,18 +470,38 @@ function CaptionsTilesOverlay(props: { room: Room }) {
         const m = text.match(/^\[Transcript\]\s+([^:]+):\s*(.*)$/);
         if (m) {
           const id = resolveIdentity(m[1]);
-          if (id) setByIdentity((prev) => ({ ...prev, [id]: { text: m[2], ts: Date.now() } }));
+          const slice = (m[2] || '').trim();
+          if (id && slice) {
+            setByIdentity((prev) => {
+              const now = Date.now();
+              const cur = prev[id] ?? { blocks: [], lastIdx: 0 };
+              const blocks = cur.blocks;
+              const last = blocks[blocks.length - 1];
+              const isTiny = slice.split(/\s+/).length < 4;
+              const endsSentence = /[.!?…]$/.test(last?.text || '');
+              const gapShort = last ? now - last.ts < 1200 : false;
+              if (last && (gapShort || !endsSentence) && isTiny) {
+                const merged = { ...last, ts: now, text: (last.text + ' ' + slice).trim() };
+                return { ...prev, [id]: { ...cur, blocks: [...blocks.slice(0, -1), merged] } };
+              }
+              const newBlock: Block = { id: nextIdRef.current++, ts: now, text: slice };
+              return { ...prev, [id]: { ...cur, blocks: [...blocks, newBlock] } };
+            });
+          }
         }
       }
     };
     room.on(RoomEvent.DataReceived, onData);
     const interval = window.setInterval(() => {
-      // prune after 6s
+      // prune: drop old blocks beyond window and stale speakers
       setByIdentity((prev) => {
         const now = Date.now();
-        const next: Record<string, { text: string; ts: number }> = {};
-        for (const [id, v] of Object.entries(prev)) {
-          if (now - v.ts < 10000) next[id] = v;
+        const next: Record<string, SpeakerState> = {};
+        for (const [id, state] of Object.entries(prev)) {
+          const prunedBlocks = state.blocks.filter((b) => now - b.ts < 12000);
+          if (prunedBlocks.length > 0 || state.partial) {
+            next[id] = { ...state, blocks: prunedBlocks };
+          }
         }
         return next;
       });
@@ -471,7 +515,7 @@ function CaptionsTilesOverlay(props: { room: Room }) {
   return (
     <>
       {Object.entries(byIdentity).map(([identity, v]) => (
-        <CaptionPortal key={identity} identity={identity} text={v.text} />)
+        <CaptionPortal key={identity} identity={identity} text={v.blocks.slice(-2).map(b => b.text).join('\n')} />)
       )}
     </>
   );
