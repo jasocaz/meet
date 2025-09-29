@@ -367,6 +367,16 @@ function HideAgentTiles() {
           (el as HTMLElement).style.display = 'none';
         }
       });
+      // After hiding agent tiles, adjust grid column count to visible tiles
+      const grid = document.querySelector('.lk-grid-layout') as HTMLElement | null;
+      if (grid) {
+        const visibleTiles = Array.from(
+          document.querySelectorAll('.lk-participant-tile'),
+        ).filter((n) => (n as HTMLElement).style.display !== 'none').length;
+        if (visibleTiles > 0) {
+          grid.style.setProperty('--lk-col-count', String(Math.min(visibleTiles, 4)));
+        }
+      }
     };
     hide();
     const obs = new MutationObserver(hide);
