@@ -249,6 +249,7 @@ function VideoConferenceComponent(props: {
     <div className="lk-room-container" style={{ position: 'relative' }}>
       <RoomContext.Provider value={room}>
         <KeyboardShortcuts />
+        <CaptionsChatBridge room={room} />
         <VideoConference
           chatMessageFormatter={chatFormatter}
           SettingsComponent={SHOW_SETTINGS_MENU ? SettingsMenu : undefined}
@@ -258,4 +259,33 @@ function VideoConferenceComponent(props: {
       </RoomContext.Provider>
     </div>
   );
+}
+
+function CaptionsChatBridge(props: { room: Room }) {
+  const { room } = props;
+  React.useEffect(() => {
+    const onData = (
+      payload: Uint8Array,
+      _participant?: any,
+      _kind?: any,
+      _topic?: string,
+    ) => {
+      try {
+        const text = new TextDecoder().decode(payload);
+        if (text.startsWith('[Transcript]') || text.startsWith('[Translation]')) {
+          // Echo into chat so LiveKit Components renders it in the chat panel
+          room.localParticipant
+            .sendChatMessage(text)
+            .catch(() => void 0);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    room.on(RoomEvent.DataReceived, onData);
+    return () => {
+      room.off(RoomEvent.DataReceived, onData);
+    };
+  }, [room]);
+  return null;
 }
