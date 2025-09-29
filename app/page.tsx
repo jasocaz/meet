@@ -44,21 +44,39 @@ function Tabs(props: React.PropsWithChildren<{}>) {
 function DemoMeetingTab(props: { label: string }) {
   const router = useRouter();
   const [e2ee, setE2ee] = useState(false);
+  const [captionsEnabled, setCaptionsEnabled] = useState(true);
   const [sharedPassphrase, setSharedPassphrase] = useState(randomString(64));
   const startMeeting = () => {
+    const roomId = generateRoomId();
+    // Fire-and-forget request to start captions agent if enabled
+    if (captionsEnabled) {
+      try {
+        const url = new URL('/api/captions/start', window.location.origin);
+        url.searchParams.set('roomName', roomId);
+        fetch(url.toString(), { method: 'POST' }).catch(() => {});
+      } catch {}
+    }
     if (e2ee) {
-      router.push(`/rooms/${generateRoomId()}#${encodePassphrase(sharedPassphrase)}`);
+      router.push(`/rooms/${roomId}#${encodePassphrase(sharedPassphrase)}`);
     } else {
-      router.push(`/rooms/${generateRoomId()}`);
+      router.push(`/rooms/${roomId}`);
     }
   };
   return (
     <div className={styles.tabContent}>
-      <p style={{ margin: 0 }}>Try LiveKit Meet for free with our live demo project.</p>
       <button style={{ marginTop: '1rem' }} className="lk-button" onClick={startMeeting}>
         Start Meeting
       </button>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'row', gap: '1rem' }}>
+          <input
+            id="captions-enabled"
+            type="checkbox"
+            checked={captionsEnabled}
+            onChange={(ev) => setCaptionsEnabled(ev.target.checked)}
+          ></input>
+          <label htmlFor="captions-enabled">Transcribe & Translate</label>
+        </div>
         <div style={{ display: 'flex', flexDirection: 'row', gap: '1rem' }}>
           <input
             id="use-e2ee"
