@@ -253,6 +253,7 @@ function VideoConferenceComponent(props: {
       <RoomContext.Provider value={room}>
         <KeyboardShortcuts />
         <CaptionsChatBridge room={room} />
+        <HideAgentTiles />
         <VideoConference
           chatMessageFormatter={chatFormatter}
           SettingsComponent={SHOW_SETTINGS_MENU ? SettingsMenu : undefined}
@@ -315,9 +316,23 @@ function isAgentParticipant(p: any): boolean {
 function TranscribingPillInControlBar() {
   const participants = useParticipants();
   const agentPresent = participants.some((p) => isAgentParticipant(p));
-  const container = React.useMemo(() => {
-    if (typeof document === 'undefined') return null;
-    return document.querySelector('.lk-control-bar');
+  const [container, setContainer] = React.useState<Element | null>(null);
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const el = document.querySelector('.lk-control-bar');
+    if (el) {
+      setContainer(el);
+      return;
+    }
+    const obs = new MutationObserver(() => {
+      const found = document.querySelector('.lk-control-bar');
+      if (found) {
+        setContainer(found);
+        obs.disconnect();
+      }
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => obs.disconnect();
   }, []);
   const pill = (
     <div
@@ -338,5 +353,25 @@ function TranscribingPillInControlBar() {
     </div>
   );
   if (container) return createPortal(pill, container);
+  return null;
+}
+
+function HideAgentTiles() {
+  const participants = useParticipants();
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const hide = () => {
+      document.querySelectorAll('.lk-participant-tile').forEach((el) => {
+        const txt = el.textContent || '';
+        if (/captions agent/i.test(txt)) {
+          (el as HTMLElement).style.display = 'none';
+        }
+      });
+    };
+    hide();
+    const obs = new MutationObserver(hide);
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, [participants]);
   return null;
 }
