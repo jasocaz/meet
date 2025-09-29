@@ -314,9 +314,9 @@ function isAgentParticipant(p: any): boolean {
   } catch {}
   const name: string | undefined = (p as any)?.name;
   const identity: string | undefined = (p as any)?.identity;
-  return (
-    (name && name.toLowerCase().includes('captions')) ||
-    (identity && identity.startsWith('captions-agent'))
+  return Boolean(
+    (!!name && name.toLowerCase().includes('captions')) ||
+      (!!identity && identity.startsWith('captions-agent'))
   );
 }
 
