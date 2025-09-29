@@ -14,11 +14,6 @@ import {
   RoomContext,
   VideoConference,
   useParticipants,
-  GridLayout,
-  useTracks,
-  ControlBar,
-  RoomAudioRenderer,
-  Chat,
 } from '@livekit/components-react';
 import {
   ExternalE2EEKeyProvider,
@@ -256,17 +251,12 @@ function VideoConferenceComponent(props: {
     <div className="lk-room-container" style={{ position: 'relative' }}>
       <RoomContext.Provider value={room}>
         <KeyboardShortcuts />
-        <RoomAudioRenderer />
         <CaptionsChatBridge room={room} />
-        <FilteredGrid />
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 12px' }}>
-          <TranscribingPill />
-          <div style={{ flex: 1 }} />
-          <ControlBar />
-        </div>
-        <div style={{ position: 'absolute', right: 12, bottom: 76, width: 360, maxWidth: '40%' }}>
-          <Chat messageFormatter={chatFormatter} />
-        </div>
+        <VideoConference
+          chatMessageFormatter={chatFormatter}
+          SettingsComponent={SHOW_SETTINGS_MENU ? SettingsMenu : undefined}
+        />
+        <TranscribingPill />
         <DebugMode />
         <RecordingIndicator />
       </RoomContext.Provider>
@@ -321,16 +311,6 @@ function isAgentParticipant(p: any): boolean {
   );
 }
 
-function FilteredGrid() {
-  const participants = useParticipants();
-  const tracks = useTracks([Track.Source.Camera, Track.Source.ScreenShare]);
-  const filteredTracks = React.useMemo(
-    () => tracks.filter((t) => !isAgentParticipant(t.participant)),
-    [tracks, participants],
-  );
-  return <GridLayout tracks={filteredTracks} />;
-}
-
 function TranscribingPill() {
   const participants = useParticipants();
   const agentPresent = participants.some((p) => isAgentParticipant(p));
@@ -353,6 +333,9 @@ function TranscribingPill() {
         padding: '8px 14px',
         borderRadius: 8,
         userSelect: 'none',
+        position: 'absolute',
+        left: 12,
+        bottom: 72,
         ...activeStyle,
       }}
     >

@@ -1,3 +1,8 @@
+/* Hide agent tiles by identity/name fallback if metadata filter fails */
+[data-lk-identity^="captions-agent"],
+[data-lk-name*="Captions"] {
+  display: none !important;
+}
 * {
   box-sizing: border-box;
 }
