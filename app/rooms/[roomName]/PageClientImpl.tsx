@@ -259,6 +259,7 @@ function VideoConferenceComponent(props: {
           SettingsComponent={SHOW_SETTINGS_MENU ? SettingsMenu : undefined}
         />
         <TranscribingPillInControlBar />
+        <CaptionsTilesOverlay room={room} />
         <DebugMode />
         <RecordingIndicator />
       </RoomContext.Provider>
@@ -389,4 +390,91 @@ function HideAgentTiles() {
     };
   }, [participants]);
   return null;
+}
+
+function CaptionsTilesOverlay(props: { room: Room }) {
+  const { room } = props;
+  const [byIdentity, setByIdentity] = React.useState<Record<string, { text: string; ts: number }>>({});
+
+  React.useEffect(() => {
+    const onData = (
+      payload: Uint8Array,
+      _p?: any,
+      _k?: any,
+      topic?: string,
+    ) => {
+      if (topic !== 'captions') return;
+      try {
+        const json = JSON.parse(new TextDecoder().decode(payload));
+        if (json?.type === 'transcription' && typeof json.speaker === 'string') {
+          setByIdentity((prev) => ({ ...prev, [json.speaker]: { text: json.text ?? '', ts: Date.now() } }));
+        }
+      } catch {}
+    };
+    room.on(RoomEvent.DataReceived, onData);
+    const interval = window.setInterval(() => {
+      // prune after 6s
+      setByIdentity((prev) => {
+        const now = Date.now();
+        const next: Record<string, { text: string; ts: number }> = {};
+        for (const [id, v] of Object.entries(prev)) {
+          if (now - v.ts < 6000) next[id] = v;
+        }
+        return next;
+      });
+    }, 2000);
+    return () => {
+      room.off(RoomEvent.DataReceived, onData);
+      window.clearInterval(interval);
+    };
+  }, [room]);
+
+  return (
+    <>
+      {Object.entries(byIdentity).map(([identity, v]) => (
+        <CaptionPortal key={identity} identity={identity} text={v.text} />)
+      )}
+    </>
+  );
+}
+
+function CaptionPortal(props: { identity: string; text: string }) {
+  const { identity, text } = props;
+  const [container, setContainer] = React.useState<Element | null>(null);
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const esc = (window as any).CSS?.escape ? (window as any).CSS.escape(identity) : identity.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+    const sel = `.lk-participant-tile[data-lk-identity="${esc}"]`;
+    const tryFind = () => {
+      const el = document.querySelector(sel);
+      if (el) setContainer(el);
+    };
+    tryFind();
+    const obs = new MutationObserver(tryFind);
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, [identity]);
+
+  if (!container) return null;
+  return createPortal(
+    <div
+      style={{
+        position: 'absolute',
+        left: 12,
+        right: 12,
+        bottom: 48,
+        padding: '6px 10px',
+        borderRadius: 8,
+        background: 'rgba(0,0,0,0.55)',
+        color: 'white',
+        pointerEvents: 'none',
+        fontSize: 14,
+        lineHeight: 1.35,
+        textAlign: 'center',
+      }}
+    >
+      {text}
+    </div>,
+    container,
+  );
 }
