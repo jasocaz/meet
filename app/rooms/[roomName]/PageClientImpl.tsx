@@ -62,6 +62,12 @@ export function PageClientImpl(props: {
     const url = new URL(CONN_DETAILS_ENDPOINT, window.location.origin);
     url.searchParams.append('roomName', props.roomName);
     url.searchParams.append('participantName', values.username);
+    // Pass through target language chosen on pre-join if available
+    const targetSelect = document.getElementById('target-lang-prejoin') as HTMLSelectElement | null;
+    const target = targetSelect?.value;
+    if (target) {
+      (window as any).__txat_target_lang = target;
+    }
     if (props.region) {
       url.searchParams.append('region', props.region);
     }
@@ -75,11 +81,41 @@ export function PageClientImpl(props: {
     <main data-lk-theme="default" style={{ height: '100%' }}>
       {connectionDetails === undefined || preJoinChoices === undefined ? (
         <div style={{ display: 'grid', placeItems: 'center', height: '100%' }}>
-          <PreJoin
-            defaults={preJoinDefaults}
-            onSubmit={handlePreJoinSubmit}
-            onError={handlePreJoinError}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+            {/* Header logo to match home page */}
+            <div className="header" style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+              <h1
+                aria-label="Txat"
+                style={{
+                  fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
+                  fontWeight: 600,
+                  fontSize: '2rem',
+                  letterSpacing: '0.02em',
+                  color: '#ff6b5f',
+                  margin: 0,
+                }}
+              >
+                Txat
+              </h1>
+            </div>
+            <PreJoin
+              defaults={preJoinDefaults}
+              onSubmit={handlePreJoinSubmit}
+              onError={handlePreJoinError}
+            />
+            {/* Language selector moved from home to pre-join */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <label htmlFor="target-lang-prejoin">Translate to</label>
+              <select id="target-lang-prejoin" defaultValue={(window as any).__txat_target_lang ?? 'es'} style={{ padding: '4px 8px' }}>
+                <option value="es">Spanish (es)</option>
+                <option value="fr">French (fr)</option>
+                <option value="de">German (de)</option>
+                <option value="ja">Japanese (ja)</option>
+                <option value="zh">Chinese (zh)</option>
+                <option value="en">English (en)</option>
+              </select>
+            </div>
+          </div>
         </div>
       ) : (
         <VideoConferenceComponent
@@ -180,6 +216,18 @@ function VideoConferenceComponent(props: {
         .catch((error) => {
           handleError(error);
         });
+      // Start captions agent if requested via URL
+      try {
+        const sp = new URLSearchParams(window.location.search);
+        const captions = sp.get('captions') === '1';
+        const target = (window as any).__txat_target_lang as string | undefined;
+        if (captions) {
+          const url = new URL('/api/captions/start', window.location.origin);
+          url.searchParams.set('roomName', (room as any)?.name || '');
+          if (target) url.searchParams.set('target', target);
+          fetch(url.toString(), { method: 'POST' }).catch(() => {});
+        }
+      } catch {}
       if (props.userChoices.videoEnabled) {
         room.localParticipant.setCameraEnabled(true).catch((error) => {
           handleError(error);

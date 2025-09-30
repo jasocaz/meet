@@ -45,23 +45,13 @@ function DemoMeetingTab(props: { label: string }) {
   const router = useRouter();
   const [e2ee, setE2ee] = useState(false);
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
-  const [targetLang, setTargetLang] = useState('es');
   const [sharedPassphrase, setSharedPassphrase] = useState(randomString(64));
   const startMeeting = () => {
     const roomId = generateRoomId();
-    // Fire-and-forget request to start captions agent if enabled
-    if (captionsEnabled) {
-      try {
-        const url = new URL('/api/captions/start', window.location.origin);
-        url.searchParams.set('roomName', roomId);
-        if (targetLang) url.searchParams.set('target', targetLang);
-        fetch(url.toString(), { method: 'POST' }).catch(() => {});
-      } catch {}
-    }
     if (e2ee) {
-      router.push(`/rooms/${roomId}#${encodePassphrase(sharedPassphrase)}`);
+      router.push(`/rooms/${roomId}?captions=${captionsEnabled ? '1' : '0'}#${encodePassphrase(sharedPassphrase)}`);
     } else {
-      router.push(`/rooms/${roomId}`);
+      router.push(`/rooms/${roomId}?captions=${captionsEnabled ? '1' : '0'}`);
     }
   };
   return (
@@ -79,24 +69,6 @@ function DemoMeetingTab(props: { label: string }) {
           ></input>
           <label htmlFor="captions-enabled">Transcribe & Translate</label>
         </div>
-        {captionsEnabled && (
-          <div style={{ display: 'flex', flexDirection: 'row', gap: '0.5rem', alignItems: 'center' }}>
-            <label htmlFor="target-lang">Translate to</label>
-            <select
-              id="target-lang"
-              value={targetLang}
-              onChange={(e) => setTargetLang(e.target.value)}
-              style={{ padding: '4px 8px' }}
-            >
-              <option value="es">Spanish (es)</option>
-              <option value="fr">French (fr)</option>
-              <option value="de">German (de)</option>
-              <option value="ja">Japanese (ja)</option>
-              <option value="zh">Chinese (zh)</option>
-              <option value="en">English (en)</option>
-            </select>
-          </div>
-        )}
         <div style={{ display: 'flex', flexDirection: 'row', gap: '1rem' }}>
           <input
             id="use-e2ee"
