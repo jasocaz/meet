@@ -255,23 +255,25 @@ function VideoConferenceComponent(props: {
       } catch {}
 
       // Send participant language preferences to agent
-      try {
-        const target = (window as any).__txat_target_lang as string | undefined;
-        const sttLang = (window as any).__txat_stt_lang as string | undefined;
-        if (target || sttLang) {
-          const langPrefs = {
-            type: 'language_prefs',
-            participantId: room.localParticipant?.identity,
-            sttLanguage: sttLang && sttLang !== 'auto' ? sttLang : undefined,
-            targetLanguage: target,
-            timestamp: new Date().toISOString()
-          };
-          await room.localParticipant?.publishData?.(
-            new TextEncoder().encode(JSON.stringify(langPrefs)),
-            { reliable: true, topic: 'captions' as any }
-          );
-        }
-      } catch {}
+      (async () => {
+        try {
+          const target = (window as any).__txat_target_lang as string | undefined;
+          const sttLang = (window as any).__txat_stt_lang as string | undefined;
+          if (target || sttLang) {
+            const langPrefs = {
+              type: 'language_prefs',
+              participantId: room.localParticipant?.identity,
+              sttLanguage: sttLang && sttLang !== 'auto' ? sttLang : undefined,
+              targetLanguage: target,
+              timestamp: new Date().toISOString()
+            };
+            await room.localParticipant?.publishData?.(
+              new TextEncoder().encode(JSON.stringify(langPrefs)),
+              { reliable: true, topic: 'captions' as any }
+            );
+          }
+        } catch {}
+      })();
       if (props.userChoices.videoEnabled) {
         room.localParticipant.setCameraEnabled(true).catch((error) => {
           handleError(error);
