@@ -202,15 +202,29 @@ export default function Page() {
   return (
     <>
       <main className={styles.main} data-lk-theme="default">
-        <div className="header">
-          <img src="/images/livekit-meet-home.svg" alt="LiveKit Meet" width="360" height="45" />
+        <div className="header" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+          {/* Replace logo with stylized Txat to match Meet wordmark */}
+          <h1
+            aria-label="Txat"
+            style={{
+              fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
+              fontWeight: 600,
+              fontSize: '3rem',
+              letterSpacing: '0.02em',
+              color: '#ff6b5f',
+              margin: 0,
+            }}
+          >
+            Txat
+          </h1>
         </div>
-        <Suspense fallback="Loading">
+        {/* Hide tabs for now but keep code for future use */}
+        {/* <Suspense fallback="Loading">
           <Tabs>
             <DemoMeetingTab label="Demo" />
             <CustomConnectionTab label="Custom" />
           </Tabs>
-        </Suspense>
+        </Suspense> */}
       </main>
       {/* Footer removed */}
     </>
