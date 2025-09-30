@@ -254,11 +254,13 @@ function VideoConferenceComponent(props: {
         }
       } catch {}
 
-      // Send participant language preferences to agent
-      (async () => {
+      // Send participant language preferences to agent (with delay to ensure room is connected)
+      setTimeout(async () => {
         try {
           const target = (window as any).__txat_target_lang as string | undefined;
           const sttLang = (window as any).__txat_stt_lang as string | undefined;
+          console.log('Language prefs from window:', { target, sttLang, identity: room.localParticipant?.identity });
+          
           if (target || sttLang) {
             const langPrefs = {
               type: 'language_prefs',
@@ -272,11 +274,14 @@ function VideoConferenceComponent(props: {
               new TextEncoder().encode(JSON.stringify(langPrefs)),
               { reliable: true, topic: 'captions' as any }
             );
+            console.log('Language preferences sent successfully');
+          } else {
+            console.log('No language preferences to send');
           }
         } catch (e) {
           console.error('Failed to send language preferences:', e);
         }
-      })();
+      }, 2000); // 2 second delay to ensure room is fully connected
       if (props.userChoices.videoEnabled) {
         room.localParticipant.setCameraEnabled(true).catch((error) => {
           handleError(error);
