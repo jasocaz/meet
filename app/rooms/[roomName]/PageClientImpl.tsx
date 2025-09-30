@@ -398,6 +398,7 @@ function CaptionsTilesOverlay(props: { room: Room }) {
   type SpeakerState = {
     blocks: Block[]; // transcript finalized blocks
     tblocks: Block[]; // translation finalized blocks
+    active?: { id: number; ts: number; text: string }; // live interim for current sentence
     partial?: string; // reserved if we ever pass interim text via LiveKit
     lastIdx: number; // cumulative length tracker if needed in future
   };
@@ -450,16 +451,19 @@ function CaptionsTilesOverlay(props: { room: Room }) {
                 const now = Date.now();
                 const cur = prev[id] ?? { blocks: [], tblocks: [], lastIdx: 0 };
                 const sid = typeof json.sentenceId === 'number' ? (json.sentenceId as number) : undefined;
-                // If sentenceId provided, upsert/replace the active sentence text
+                // If we have a sentenceId, treat non-final as active and final as a commit
                 if (sid != null) {
-                  const idx = cur.blocks.findIndex((b) => b.id === sid);
-                  const blocks = cur.blocks.slice();
-                  if (idx !== -1) {
-                    blocks[idx] = { id: sid, ts: now, text: slice };
+                  if (json.final) {
+                    const idx = cur.blocks.findIndex((b) => b.id === sid);
+                    const blocks = cur.blocks.slice();
+                    if (idx !== -1) blocks[idx] = { id: sid, ts: now, text: slice };
+                    else blocks.push({ id: sid, ts: now, text: slice });
+                    const next: SpeakerState = { ...cur, blocks };
+                    if (cur.active?.id === sid) next.active = undefined;
+                    return { ...prev, [id]: next };
                   } else {
-                    blocks.push({ id: sid, ts: now, text: slice });
+                    return { ...prev, [id]: { ...cur, active: { id: sid, ts: now, text: slice } } };
                   }
-                  return { ...prev, [id]: { ...cur, blocks } };
                 }
                 // Fallback heuristic merge (older agents)
                 const blocks = cur.blocks;
@@ -704,7 +708,7 @@ function CaptionPortal(props: { identity: string; blocks: { id: number; ts: numb
           borderBottom: '1px solid rgba(255,255,255,0.15)'
         }}
       >
-        {blocks.length === 0 ? (
+        {blocks.length === 0 && !byIdentity[identity]?.active ? (
           <div style={{ opacity: 0.8 }}>Transcript will appear here…</div>
         ) : (
           blocks.map((b) => (
@@ -715,6 +719,14 @@ function CaptionPortal(props: { identity: string; blocks: { id: number; ts: numb
               <span>{b.text}</span>
             </div>
           ))
+        )}
+        {byIdentity[identity]?.active && (
+          <div key={`active-${byIdentity[identity]!.active!.id}`} style={{ whiteSpace: 'pre-wrap', marginBottom: 6, opacity: 0.9, fontStyle: 'italic' }}>
+            <span style={{ color: 'rgba(255,255,255,0.6)', marginRight: 8 }}>
+              [{new Date(byIdentity[identity]!.active!.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}]
+            </span>
+            <span>{byIdentity[identity]!.active!.text}</span>
+          </div>
         )}
       </div>
 
