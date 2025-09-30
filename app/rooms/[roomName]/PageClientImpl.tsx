@@ -582,14 +582,14 @@ function CaptionsTilesOverlay(props: { room: Room }) {
   return (
     <>
       {Object.entries(byIdentity).map(([identity, v]) => (
-        <CaptionPortal key={identity} identity={identity} blocks={v.blocks} tblocks={v.tblocks} />)
+        <CaptionPortal key={identity} identity={identity} blocks={v.blocks} tblocks={v.tblocks} active={v.active} />)
       )}
     </>
   );
 }
 
-function CaptionPortal(props: { identity: string; blocks: { id: number; ts: number; text: string }[]; tblocks: { id: number; ts: number; text: string }[] }) {
-  const { identity, blocks, tblocks } = props;
+function CaptionPortal(props: { identity: string; blocks: { id: number; ts: number; text: string }[]; tblocks: { id: number; ts: number; text: string }[]; active?: { id: number; ts: number; text: string } }) {
+  const { identity, blocks, tblocks, active } = props;
   const participants = useParticipants();
   const [container, setContainer] = React.useState<Element | null>(null);
   const transcriptRef = React.useRef<HTMLDivElement | null>(null);
@@ -708,7 +708,7 @@ function CaptionPortal(props: { identity: string; blocks: { id: number; ts: numb
           borderBottom: '1px solid rgba(255,255,255,0.15)'
         }}
       >
-        {blocks.length === 0 && !byIdentity[identity]?.active ? (
+        {blocks.length === 0 && !active ? (
           <div style={{ opacity: 0.8 }}>Transcript will appear here…</div>
         ) : (
           blocks.map((b) => (
@@ -720,12 +720,12 @@ function CaptionPortal(props: { identity: string; blocks: { id: number; ts: numb
             </div>
           ))
         )}
-        {byIdentity[identity]?.active && (
-          <div key={`active-${byIdentity[identity]!.active!.id}`} style={{ whiteSpace: 'pre-wrap', marginBottom: 6, opacity: 0.9, fontStyle: 'italic' }}>
+        {active && (
+          <div key={`active-${active.id}`} style={{ whiteSpace: 'pre-wrap', marginBottom: 6, opacity: 0.9, fontStyle: 'italic' }}>
             <span style={{ color: 'rgba(255,255,255,0.6)', marginRight: 8 }}>
-              [{new Date(byIdentity[identity]!.active!.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}]
+              [{new Date(active.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}]
             </span>
-            <span>{byIdentity[identity]!.active!.text}</span>
+            <span>{active.text}</span>
           </div>
         )}
       </div>
