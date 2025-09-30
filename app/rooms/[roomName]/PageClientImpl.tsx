@@ -122,6 +122,7 @@ export function PageClientImpl(props: {
           connectionDetails={connectionDetails}
           userChoices={preJoinChoices}
           options={{ codec: props.codec, hq: props.hq }}
+          roomName={props.roomName}
         />
       )}
     </main>
@@ -135,6 +136,7 @@ function VideoConferenceComponent(props: {
     hq: boolean;
     codec: VideoCodec;
   };
+  roomName: string;
 }) {
   const keyProvider = new ExternalE2EEKeyProvider();
   const { worker, e2eePassphrase } = useSetupE2EE();
@@ -223,7 +225,7 @@ function VideoConferenceComponent(props: {
         const target = (window as any).__txat_target_lang as string | undefined;
         if (captions) {
           const url = new URL('/api/captions/start', window.location.origin);
-          url.searchParams.set('roomName', (room as any)?.name || '');
+          url.searchParams.set('roomName', props.roomName || (room as any)?.name || '');
           if (target) url.searchParams.set('target', target);
           fetch(url.toString(), { method: 'POST' }).catch(() => {});
         }
