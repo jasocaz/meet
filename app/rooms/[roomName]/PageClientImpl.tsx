@@ -360,7 +360,8 @@ function TranscribingPillInControlBar() {
 
 function CopyLinkButtonInControlBar() {
   const [container, setContainer] = React.useState<Element | null>(null);
-  const [copied, setCopied] = React.useState(false);
+  const [mount, setMount] = React.useState<HTMLElement | null>(null);
+  const [blink, setBlink] = React.useState(0);
   React.useEffect(() => {
     if (typeof document === 'undefined') return;
     const el = document.querySelector('.lk-control-bar');
@@ -379,12 +380,47 @@ function CopyLinkButtonInControlBar() {
     return () => obs.disconnect();
   }, []);
 
+  // Create a stable mount point between Share Screen and Chat
+  React.useEffect(() => {
+    if (!container) return;
+    const ensureMount = () => {
+      // Prefer to insert before Chat button
+      const chatBtn = container.querySelector('button[aria-label="Chat"], button[aria-label="Toggle chat"]');
+      // Alternatively, after Share Screen
+      const shareBtn = container.querySelector('button[aria-label*="share" i], button[aria-label*="screen" i]');
+      let m = mount;
+      if (!m) {
+        m = document.createElement('span');
+        m.style.display = 'inline-flex';
+        m.style.alignItems = 'center';
+        setMount(m);
+      }
+      if (chatBtn && chatBtn.parentElement && m.parentElement !== chatBtn.parentElement) {
+        chatBtn.parentElement.insertBefore(m, chatBtn);
+      } else if (shareBtn && shareBtn.parentElement) {
+        // insert after share button
+        const parent = shareBtn.parentElement;
+        if (shareBtn.nextSibling) parent.insertBefore(m, shareBtn.nextSibling);
+        else parent.appendChild(m);
+      } else if (!m.parentElement) {
+        container.appendChild(m);
+      }
+    };
+    ensureMount();
+    const obs = new MutationObserver(() => ensureMount());
+    obs.observe(container, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, [container, mount]);
+
   const handleCopy = React.useCallback(() => {
     try {
       const href = window.location.href;
       navigator.clipboard.writeText(href).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1200);
+        // Blink border red twice
+        setBlink(1);
+        setTimeout(() => setBlink(0), 150);
+        setTimeout(() => setBlink(1), 300);
+        setTimeout(() => setBlink(0), 450);
       });
     } catch {}
   }, []);
@@ -397,16 +433,13 @@ function CopyLinkButtonInControlBar() {
   );
 
   const button = (
-    <button className="lk-button" onClick={handleCopy} aria-label="Copy meeting link" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+    <button className="lk-button" onClick={handleCopy} aria-label="Copy meeting link" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: blink ? '2px solid #e5484d' : undefined }}>
       {copyIcon}
       <span>Link</span>
-      {copied && (
-        <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.8 }}>Copied</span>
-      )}
     </button>
   );
 
-  if (container) return createPortal(button, container);
+  if (mount) return createPortal(button, mount);
   return null;
 }
 
