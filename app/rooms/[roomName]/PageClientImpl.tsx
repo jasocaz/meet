@@ -258,6 +258,7 @@ function VideoConferenceComponent(props: {
           chatMessageFormatter={chatFormatter}
           SettingsComponent={SHOW_SETTINGS_MENU ? SettingsMenu : undefined}
         />
+        <CopyLinkButtonInControlBar />
         <TranscribingPillInControlBar />
         <CaptionsTilesOverlay room={room} />
         <DebugMode />
@@ -354,6 +355,58 @@ function TranscribingPillInControlBar() {
     </div>
   );
   if (container) return createPortal(pill, container);
+  return null;
+}
+
+function CopyLinkButtonInControlBar() {
+  const [container, setContainer] = React.useState<Element | null>(null);
+  const [copied, setCopied] = React.useState(false);
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const el = document.querySelector('.lk-control-bar');
+    if (el) {
+      setContainer(el);
+      return;
+    }
+    const obs = new MutationObserver(() => {
+      const found = document.querySelector('.lk-control-bar');
+      if (found) {
+        setContainer(found);
+        obs.disconnect();
+      }
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, []);
+
+  const handleCopy = React.useCallback(() => {
+    try {
+      const href = window.location.href;
+      navigator.clipboard.writeText(href).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      });
+    } catch {}
+  }, []);
+
+  const copyIcon = (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </svg>
+  );
+
+  const button = (
+    <button className="lk-button" onClick={handleCopy} aria-label="Copy meeting link" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      {copyIcon}
+      <span>Link</span>
+      {copied && (
+        <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.8 }}>Copied</span>
+      )}
+    </button>
+  );
+
+  if (container) return createPortal(button, container);
   return null;
 }
 
