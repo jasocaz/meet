@@ -67,6 +67,7 @@ export function PageClientImpl(props: {
     const target = targetSelect?.value;
     if (target) {
       (window as any).__txat_target_lang = target;
+      try { localStorage.setItem('txat_target_lang', target); } catch {}
     }
     // Capture STT input language (spoken language)
     const sttSelect = document.getElementById('stt-lang-prejoin') as HTMLSelectElement | null;
@@ -112,7 +113,7 @@ export function PageClientImpl(props: {
             {/* Language selector moved from home to pre-join */}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <label htmlFor="target-lang-prejoin">Translate to</label>
-              <select id="target-lang-prejoin" defaultValue={(window as any).__txat_target_lang ?? 'es'} style={{ padding: '4px 8px' }}>
+              <select id="target-lang-prejoin" defaultValue={(typeof window !== 'undefined' ? ((window as any).__txat_target_lang || new URLSearchParams(window.location.search).get('target') || (typeof localStorage !== 'undefined' ? localStorage.getItem('txat_target_lang') : null)) : null) ?? 'en'} style={{ padding: '4px 8px' }}>
                 <option value="es">Spanish (es)</option>
                 <option value="fr">French (fr)</option>
                 <option value="de">German (de)</option>
@@ -250,6 +251,25 @@ function VideoConferenceComponent(props: {
           if (target) url.searchParams.set('target', target);
           if (sttLang && sttLang !== 'auto') url.searchParams.set('stt', sttLang);
           fetch(url.toString(), { method: 'POST' }).catch(() => {});
+        }
+      } catch {}
+
+      // Send participant language preferences to agent
+      try {
+        const target = (window as any).__txat_target_lang as string | undefined;
+        const sttLang = (window as any).__txat_stt_lang as string | undefined;
+        if (target || sttLang) {
+          const langPrefs = {
+            type: 'language_prefs',
+            participantId: room.localParticipant?.identity,
+            sttLanguage: sttLang && sttLang !== 'auto' ? sttLang : undefined,
+            targetLanguage: target,
+            timestamp: new Date().toISOString()
+          };
+          await room.localParticipant?.publishData?.(
+            new TextEncoder().encode(JSON.stringify(langPrefs)),
+            { reliable: true, topic: 'captions' as any }
+          );
         }
       } catch {}
       if (props.userChoices.videoEnabled) {
