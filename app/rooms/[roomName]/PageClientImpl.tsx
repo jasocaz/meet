@@ -384,29 +384,18 @@ function CopyLinkButtonInControlBar() {
   React.useEffect(() => {
     if (!container) return;
     const ensureMount = () => {
-      // Remove any existing mount points first
-      const existingMounts = container.querySelectorAll('[data-link-button-mount]');
-      existingMounts.forEach((m) => m.remove());
-
       // Prefer to insert before Chat button
-      const chatBtn = container.querySelector(
-        'button[aria-label="Chat"], button[aria-label="Toggle chat"]',
-      );
+      const chatBtn = container.querySelector('button[aria-label="Chat"], button[aria-label="Toggle chat"]');
       // Alternatively, after Share Screen
-      const shareBtn = container.querySelector(
-        'button[aria-label*="share" i], button[aria-label*="screen" i]',
-      );
-
+      const shareBtn = container.querySelector('button[aria-label*="share" i], button[aria-label*="screen" i]');
       let m = mount;
       if (!m) {
         m = document.createElement('span');
-        m.setAttribute('data-link-button-mount', 'true');
         m.style.display = 'inline-flex';
         m.style.alignItems = 'center';
         setMount(m);
       }
-
-      if (chatBtn && chatBtn.parentElement) {
+      if (chatBtn && chatBtn.parentElement && m.parentElement !== chatBtn.parentElement) {
         chatBtn.parentElement.insertBefore(m, chatBtn);
       } else if (shareBtn && shareBtn.parentElement) {
         // insert after share button
@@ -437,35 +426,14 @@ function CopyLinkButtonInControlBar() {
   }, []);
 
   const copyIcon = (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
     </svg>
   );
 
   const button = (
-    <button
-      className="lk-button"
-      onClick={handleCopy}
-      aria-label="Copy meeting link"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        border: '2px solid transparent',
-        borderColor: blink ? '#e5484d' : 'transparent',
-      }}
-    >
+    <button className="lk-button" onClick={handleCopy} aria-label="Copy meeting link" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: blink ? '2px solid #e5484d' : undefined }}>
       {copyIcon}
       <span>Link</span>
     </button>
@@ -474,7 +442,6 @@ function CopyLinkButtonInControlBar() {
   if (mount) return createPortal(button, mount);
   return null;
 }
-
 
 function HideAgentTiles() {
   const participants = useParticipants();
