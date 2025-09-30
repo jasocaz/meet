@@ -574,14 +574,10 @@ function CaptionsTilesOverlay(props: { room: Room }) {
       if (starts) return starts.identity;
       const byName = participants.find((p) => p.name?.toLowerCase() === base);
       if (byName?.identity) return byName.identity;
-      // Fallback: attach to local participant tile so text is visible somewhere
-      try {
-        return (room.localParticipant as any)?.identity as string | undefined;
-      } catch {
-        return undefined;
-      }
+      // Do NOT fallback to local identity; keep the original speaker identity so we can attach later
+      return speaker;
     },
-    [participants, room],
+    [participants],
   );
 
   React.useEffect(() => {
@@ -737,6 +733,9 @@ function CaptionsTilesOverlay(props: { room: Room }) {
     };
   }, [room]);
 
+  // Only render overlays when the agent is present
+  const agentPresent = participants.some((p) => isAgentParticipant(p));
+  if (!agentPresent) return null;
   return (
     <>
       {Object.entries(byIdentity).map(([identity, v]) => (
@@ -793,6 +792,8 @@ function CaptionPortal(props: { identity: string; blocks: { id: number; ts: numb
           h.style.overflow = 'visible';
         }
         setContainer(h);
+      } else {
+        // If not found yet, keep waiting for future mutations without falling back to local tile
       }
     };
     tryFind();
