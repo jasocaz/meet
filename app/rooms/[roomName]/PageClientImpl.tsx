@@ -449,8 +449,27 @@ function CaptionsTilesOverlay(props: { room: Room }) {
               setByIdentity((prev) => {
                 const now = Date.now();
                 const cur = prev[id] ?? { blocks: [], tblocks: [], lastIdx: 0 };
+                const sid = typeof json.sentenceId === 'number' ? (json.sentenceId as number) : undefined;
+                // If sentenceId provided, upsert/replace the active sentence text
+                if (sid != null) {
+                  const idx = cur.blocks.findIndex((b) => b.id === sid);
+                  const blocks = cur.blocks.slice();
+                  if (idx !== -1) {
+                    blocks[idx] = { id: sid, ts: now, text: slice };
+                  } else {
+                    blocks.push({ id: sid, ts: now, text: slice });
+                  }
+                  return { ...prev, [id]: { ...cur, blocks } };
+                }
+                // Fallback heuristic merge (older agents)
                 const blocks = cur.blocks;
                 const last = blocks[blocks.length - 1];
+                // If the new slice is a strict extension/rewrite of the last line, replace last
+                if (last && (slice.startsWith(last.text) || last.text.startsWith(slice))) {
+                  const next = blocks.slice();
+                  next[next.length - 1] = { ...last, ts: now, text: slice };
+                  return { ...prev, [id]: { ...cur, blocks: next } };
+                }
                 const isTiny = slice.split(/\s+/).length < 4;
                 const endsSentence = /[.!?…]$/.test(last?.text || '');
                 const gapShort = last ? now - last.ts < 1200 : false;
@@ -466,10 +485,23 @@ function CaptionsTilesOverlay(props: { room: Room }) {
           else if (json?.type === 'translation') {
             const id = resolveIdentity(json.speaker);
             const slice = String(json.translatedText ?? json.text ?? '').trim();
+            const sid = typeof json.sentenceId === 'number' ? (json.sentenceId as number) : undefined;
             if (id && slice) {
               setByIdentity((prev) => {
                 const now = Date.now();
                 const cur = prev[id] ?? { blocks: [], tblocks: [], lastIdx: 0 };
+                // If agent provided a sentenceId, upsert by that id to avoid splits
+                if (sid != null) {
+                  const idx = cur.tblocks.findIndex((b) => b.id === sid);
+                  const tblocks = cur.tblocks.slice();
+                  if (idx !== -1) {
+                    tblocks[idx] = { ...tblocks[idx], ts: now, text: slice };
+                  } else {
+                    tblocks.push({ id: sid, ts: now, text: slice });
+                  }
+                  return { ...prev, [id]: { ...cur, tblocks } };
+                }
+                // Fallback heuristic merge (older agents)
                 const blocks = cur.tblocks;
                 const last = blocks[blocks.length - 1];
                 const isTiny = slice.split(/\s+/).length < 4;
