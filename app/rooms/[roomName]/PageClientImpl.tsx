@@ -267,12 +267,15 @@ function VideoConferenceComponent(props: {
               targetLanguage: target,
               timestamp: new Date().toISOString()
             };
+            console.log('Sending language preferences:', langPrefs);
             await room.localParticipant?.publishData?.(
               new TextEncoder().encode(JSON.stringify(langPrefs)),
               { reliable: true, topic: 'captions' as any }
             );
           }
-        } catch {}
+        } catch (e) {
+          console.error('Failed to send language preferences:', e);
+        }
       })();
       if (props.userChoices.videoEnabled) {
         room.localParticipant.setCameraEnabled(true).catch((error) => {
