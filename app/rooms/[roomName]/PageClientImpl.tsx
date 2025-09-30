@@ -68,6 +68,12 @@ export function PageClientImpl(props: {
     if (target) {
       (window as any).__txat_target_lang = target;
     }
+    // Capture STT input language (spoken language)
+    const sttSelect = document.getElementById('stt-lang-prejoin') as HTMLSelectElement | null;
+    const sttLang = sttSelect?.value;
+    if (sttLang) {
+      (window as any).__txat_stt_lang = sttLang;
+    }
     if (props.region) {
       url.searchParams.append('region', props.region);
     }
@@ -113,6 +119,20 @@ export function PageClientImpl(props: {
                 <option value="ja">Japanese (ja)</option>
                 <option value="zh">Chinese (zh)</option>
                 <option value="en">English (en)</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <label htmlFor="stt-lang-prejoin">Spoken language</label>
+              <select id="stt-lang-prejoin" defaultValue={(typeof navigator !== 'undefined' ? (navigator.language || 'en').slice(0,2) : 'en')} style={{ padding: '4px 8px' }}>
+                <option value="auto">Auto-detect</option>
+                <option value="en">English (en)</option>
+                <option value="es">Spanish (es)</option>
+                <option value="fr">French (fr)</option>
+                <option value="de">German (de)</option>
+                <option value="it">Italian (it)</option>
+                <option value="pt">Portuguese (pt)</option>
+                <option value="ja">Japanese (ja)</option>
+                <option value="zh">Chinese (zh)</option>
               </select>
             </div>
           </div>
@@ -223,10 +243,12 @@ function VideoConferenceComponent(props: {
         const sp = new URLSearchParams(window.location.search);
         const captions = sp.get('captions') === '1';
         const target = (window as any).__txat_target_lang as string | undefined;
+        const sttLang = (window as any).__txat_stt_lang as string | undefined;
         if (captions) {
           const url = new URL('/api/captions/start', window.location.origin);
           url.searchParams.set('roomName', props.roomName || (room as any)?.name || '');
           if (target) url.searchParams.set('target', target);
+          if (sttLang && sttLang !== 'auto') url.searchParams.set('stt', sttLang);
           fetch(url.toString(), { method: 'POST' }).catch(() => {});
         }
       } catch {}

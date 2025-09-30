@@ -4,6 +4,7 @@ export async function POST(req: NextRequest) {
   try {
     const roomName = req.nextUrl.searchParams.get('roomName');
     const targetLanguage = req.nextUrl.searchParams.get('target') || 'en';
+    const sttLanguage = req.nextUrl.searchParams.get('stt') || undefined;
     
     if (!roomName) {
       return new NextResponse('Missing roomName', { status: 400 });
@@ -22,7 +23,8 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({ 
         roomName,
-        targetLanguage 
+        targetLanguage,
+        sttLanguage
       }),
       cache: 'no-store',
     });
