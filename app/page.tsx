@@ -218,13 +218,10 @@ export default function Page() {
             Txat
           </h1>
         </div>
-        {/* Hide tabs for now but keep code for future use */}
-        {/* <Suspense fallback="Loading">
-          <Tabs>
-            <DemoMeetingTab label="Demo" />
-            <CustomConnectionTab label="Custom" />
-          </Tabs>
-        </Suspense> */}
+        {/* Show Demo content directly without tab selector */}
+        <Suspense fallback="Loading">
+          <DemoMeetingTab label="Demo" />
+        </Suspense>
       </main>
       {/* Footer removed */}
     </>
