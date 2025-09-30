@@ -384,18 +384,25 @@ function CopyLinkButtonInControlBar() {
   React.useEffect(() => {
     if (!container) return;
     const ensureMount = () => {
+      // Remove any existing mount points first
+      const existingMounts = container.querySelectorAll('[data-link-button-mount]');
+      existingMounts.forEach(m => m.remove());
+      
       // Prefer to insert before Chat button
       const chatBtn = container.querySelector('button[aria-label="Chat"], button[aria-label="Toggle chat"]');
       // Alternatively, after Share Screen
       const shareBtn = container.querySelector('button[aria-label*="share" i], button[aria-label*="screen" i]');
+      
       let m = mount;
       if (!m) {
         m = document.createElement('span');
+        m.setAttribute('data-link-button-mount', 'true');
         m.style.display = 'inline-flex';
         m.style.alignItems = 'center';
         setMount(m);
       }
-      if (chatBtn && chatBtn.parentElement && m.parentElement !== chatBtn.parentElement) {
+      
+      if (chatBtn && chatBtn.parentElement) {
         chatBtn.parentElement.insertBefore(m, chatBtn);
       } else if (shareBtn && shareBtn.parentElement) {
         // insert after share button
@@ -433,7 +440,7 @@ function CopyLinkButtonInControlBar() {
   );
 
   const button = (
-    <button className="lk-button" onClick={handleCopy} aria-label="Copy meeting link" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: blink ? '2px solid #e5484d' : undefined }}>
+    <button className="lk-button" onClick={handleCopy} aria-label="Copy meeting link" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: '2px solid transparent', borderColor: blink ? '#e5484d' : 'transparent' }}>
       {copyIcon}
       <span>Link</span>
     </button>
