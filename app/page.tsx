@@ -46,6 +46,8 @@ function DemoMeetingTab(props: { label: string }) {
   const [e2ee, setE2ee] = useState(false);
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
   const [sharedPassphrase, setSharedPassphrase] = useState(randomString(64));
+  const [joinRoomId, setJoinRoomId] = useState('');
+  
   const startMeeting = () => {
     const roomId = generateRoomId();
     if (e2ee) {
@@ -54,41 +56,73 @@ function DemoMeetingTab(props: { label: string }) {
       router.push(`/rooms/${roomId}?captions=${captionsEnabled ? '1' : '0'}`);
     }
   };
+
+  const joinMeeting = () => {
+    if (!joinRoomId.trim()) return;
+    const roomId = joinRoomId.trim();
+    if (e2ee) {
+      router.push(`/rooms/${roomId}?captions=${captionsEnabled ? '1' : '0'}#${encodePassphrase(sharedPassphrase)}`);
+    } else {
+      router.push(`/rooms/${roomId}?captions=${captionsEnabled ? '1' : '0'}`);
+    }
+  };
   return (
     <div className={styles.tabContent}>
-      <button style={{ marginTop: '1rem' }} className="lk-button" onClick={startMeeting}>
-        Start Meeting
-      </button>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'row', gap: '1rem' }}>
+        <button style={{ marginTop: '1rem' }} className="lk-button" onClick={startMeeting}>
+          Start Meeting
+        </button>
+        
+        <div style={{ display: 'flex', flexDirection: 'row', gap: '0.5rem', alignItems: 'center' }}>
           <input
-            id="captions-enabled"
-            type="checkbox"
-            checked={captionsEnabled}
-            onChange={(ev) => setCaptionsEnabled(ev.target.checked)}
-          ></input>
-          <label htmlFor="captions-enabled">Transcribe & Translate</label>
+            type="text"
+            placeholder="Enter meeting ID"
+            value={joinRoomId}
+            onChange={(e) => setJoinRoomId(e.target.value)}
+            style={{ flex: 1, padding: '8px 12px', borderRadius: '4px', border: '1px solid #ccc' }}
+            onKeyPress={(e) => e.key === 'Enter' && joinMeeting()}
+          />
+          <button 
+            className="lk-button" 
+            onClick={joinMeeting}
+            disabled={!joinRoomId.trim()}
+            style={{ padding: '8px 16px' }}
+          >
+            Join Meeting
+          </button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'row', gap: '1rem' }}>
-          <input
-            id="use-e2ee"
-            type="checkbox"
-            checked={e2ee}
-            onChange={(ev) => setE2ee(ev.target.checked)}
-          ></input>
-          <label htmlFor="use-e2ee">Enable end-to-end encryption</label>
-        </div>
-        {e2ee && (
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', flexDirection: 'row', gap: '1rem' }}>
-            <label htmlFor="passphrase">Passphrase</label>
             <input
-              id="passphrase"
-              type="password"
-              value={sharedPassphrase}
-              onChange={(ev) => setSharedPassphrase(ev.target.value)}
-            />
+              id="captions-enabled"
+              type="checkbox"
+              checked={captionsEnabled}
+              onChange={(ev) => setCaptionsEnabled(ev.target.checked)}
+            ></input>
+            <label htmlFor="captions-enabled">Transcribe & Translate</label>
           </div>
-        )}
+          <div style={{ display: 'flex', flexDirection: 'row', gap: '1rem' }}>
+            <input
+              id="use-e2ee"
+              type="checkbox"
+              checked={e2ee}
+              onChange={(ev) => setE2ee(ev.target.checked)}
+            ></input>
+            <label htmlFor="use-e2ee">Enable end-to-end encryption</label>
+          </div>
+          {e2ee && (
+            <div style={{ display: 'flex', flexDirection: 'row', gap: '1rem' }}>
+              <label htmlFor="passphrase">Passphrase</label>
+              <input
+                id="passphrase"
+                type="password"
+                value={sharedPassphrase}
+                onChange={(ev) => setSharedPassphrase(ev.target.value)}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
