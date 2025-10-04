@@ -36,6 +36,7 @@ import { useLowCPUOptimizer } from '@/lib/usePerfomanceOptimiser';
 const CONN_DETAILS_ENDPOINT =
   process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT ?? '/api/connection-details';
 const SHOW_SETTINGS_MENU = process.env.NEXT_PUBLIC_SHOW_SETTINGS_MENU == 'true';
+const CAPTIONS_MODE = (process.env.NEXT_PUBLIC_CAPTIONS_MODE || 'agent').toLowerCase();
 
 export function PageClientImpl(props: {
   roomName: string;
@@ -239,18 +240,22 @@ function VideoConferenceComponent(props: {
         .catch((error) => {
           handleError(error);
         });
-      // Start captions agent if requested via URL
+      // Start captions depending on mode
       try {
         const sp = new URLSearchParams(window.location.search);
         const captions = sp.get('captions') === '1';
-        const target = (window as any).__txat_target_lang as string | undefined;
-        const sttLang = (window as any).__txat_stt_lang as string | undefined;
         if (captions) {
-          const url = new URL('/api/captions/start', window.location.origin);
-          url.searchParams.set('roomName', props.roomName || (room as any)?.name || '');
-          if (target) url.searchParams.set('target', target);
-          if (sttLang && sttLang !== 'auto') url.searchParams.set('stt', sttLang);
-          fetch(url.toString(), { method: 'POST' }).catch(() => {});
+          if (CAPTIONS_MODE === 'agent') {
+            const target = (window as any).__txat_target_lang as string | undefined;
+            const sttLang = (window as any).__txat_stt_lang as string | undefined;
+            const url = new URL('/api/captions/start', window.location.origin);
+            url.searchParams.set('roomName', props.roomName || (room as any)?.name || '');
+            if (target) url.searchParams.set('target', target);
+            if (sttLang && sttLang !== 'auto') url.searchParams.set('stt', sttLang);
+            fetch(url.toString(), { method: 'POST' }).catch(() => {});
+          } else {
+            // client mode: will be handled by local transcriber
+          }
         }
       } catch {}
 
@@ -291,6 +296,73 @@ function VideoConferenceComponent(props: {
         room.localParticipant.setMicrophoneEnabled(true).catch((error) => {
           handleError(error);
         });
+      }
+
+      // In client captions mode, start local transcriber after join
+      if (sp.get('captions') === '1' && CAPTIONS_MODE === 'client') {
+        (async () => {
+          try {
+            const sttLang = (window as any).__txat_stt_lang as string | undefined;
+            const trackPub = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+            const mediaStreamTrack = trackPub?.audioTrack?.mediaStream?.getAudioTracks?.()?.[0];
+            if (!mediaStreamTrack) return;
+            const stream = new MediaStream([mediaStreamTrack]);
+            const rec = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            let sid = 0;
+            rec.ondataavailable = async (e) => {
+              if (!e.data || e.data.size === 0) return;
+              // Send to STT proxy
+              const form = new FormData();
+              form.append('file', e.data, 'chunk.webm');
+              const u = new URL('/api/stt', window.location.origin);
+              if (sttLang && sttLang !== 'auto') u.searchParams.set('lang', sttLang);
+              const r = await fetch(u.toString(), { method: 'POST', body: form });
+              if (!r.ok) return;
+              const j = await r.json();
+              const text = String(j?.text || '').trim();
+              if (!text) return;
+              // Publish interim as active; mark as final when punctuation or short phrase
+              const ends = /[.!?…]$/.test(text);
+              const words = text.split(/\s+/).filter(Boolean).length;
+              const isVeryShort = words <= 3 && text.length <= 20;
+              const final = Boolean(ends || isVeryShort);
+              const payload = {
+                type: 'transcription',
+                speaker: room.localParticipant.identity,
+                text,
+                final,
+                sentenceId: final ? ++sid : sid || (sid = 1),
+                timestamp: new Date().toISOString(),
+              };
+              room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify(payload)), { reliable: true, topic: 'captions' as any }).catch(() => {});
+              if (final) {
+                const target = (window as any).__txat_target_lang as string | undefined;
+                if (target) {
+                  const tr = await fetch('/api/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, target }) });
+                  if (tr.ok) {
+                    const tj = await tr.json();
+                    const translatedText = String(tj?.translated || '').trim();
+                    if (translatedText) {
+                      const tmsg = {
+                        type: 'translation',
+                        speaker: room.localParticipant.identity,
+                        text,
+                        translatedText,
+                        sentenceId: sid,
+                        final: true,
+                        timestamp: new Date().toISOString(),
+                      };
+                      room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify(tmsg)), { reliable: true, topic: 'captions' as any }).catch(() => {});
+                    }
+                  }
+                }
+              }
+            };
+            rec.start(700); // ~0.7s chunks for responsiveness
+          } catch (err) {
+            console.error('Local transcriber failed:', err);
+          }
+        })();
       }
     }
     return () => {
