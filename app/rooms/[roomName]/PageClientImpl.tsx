@@ -241,9 +241,8 @@ function VideoConferenceComponent(props: {
           handleError(error);
         });
       // Start captions depending on mode
+      const captions = new URLSearchParams(window.location.search).get('captions') === '1';
       try {
-        const sp = new URLSearchParams(window.location.search);
-        const captions = sp.get('captions') === '1';
         if (captions) {
           if (CAPTIONS_MODE === 'agent') {
             const target = (window as any).__txat_target_lang as string | undefined;
@@ -299,7 +298,7 @@ function VideoConferenceComponent(props: {
       }
 
       // In client captions mode, start local transcriber after join
-      if (sp.get('captions') === '1' && CAPTIONS_MODE === 'client') {
+      if (captions && CAPTIONS_MODE === 'client') {
         (async () => {
           try {
             const sttLang = (window as any).__txat_stt_lang as string | undefined;
